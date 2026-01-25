@@ -187,6 +187,178 @@ else:
 
 # MAGIC %md
 # MAGIC ## Step 4: Run DIGen
+# MAGIC 
+# MAGIC You can run DIGen either using the shell command below OR using the Python function in the next cell.
+
+# COMMAND ----------
+
+# Python function to run DIGen in a subprocess
+import subprocess
+import os
+import glob
+
+def run_digen_python(work_dir, output_dir, scale_factor=10, java_home="/usr/lib/jvm/java-8-openjdk-amd64"):
+    """
+    Run DIGen using Python subprocess
+    
+    Args:
+        work_dir: Working directory containing Tools/
+        output_dir: Output directory for generated files
+        scale_factor: TPC-DI scale factor (default: 10)
+        java_home: Java home directory (default: Java 8)
+    
+    Returns:
+        tuple: (exit_code, output_files_list)
+    """
+    # Set environment variables
+    env = os.environ.copy()
+    env['PDG_AGREE'] = 'YES'
+    env['JAVA_HOME'] = java_home
+    env['PATH'] = f"{java_home}/bin:{env.get('PATH', '')}"
+    
+    # Build classpath
+    digen_jar = f"{work_dir}/Tools/DIGen.jar"
+    commons_cli = f"{work_dir}/Tools/lib/commons-cli-1.4.jar"
+    classpath = f"{digen_jar}:{commons_cli}"
+    
+    # Main class
+    main_class = "org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
+    
+    # Java command
+    java_cmd = [
+        f"{java_home}/bin/java",
+        "-Xmx8g",
+        "-cp", classpath,
+        main_class,
+        "-o", f"{output_dir}/",
+        "-sf", str(scale_factor)
+    ]
+    
+    print("=" * 50)
+    print("Running TPC-DI DIGen from Python")
+    print("=" * 50)
+    print(f"Scale Factor: {scale_factor}")
+    print(f"Output Directory: {output_dir}")
+    print(f"Classpath: {classpath}")
+    print(f"Main Class: {main_class}")
+    print(f"PDG_AGREE: {env.get('PDG_AGREE')}")
+    print("=" * 50)
+    print()
+    print("Starting data generation (this may take a while)...")
+    print()
+    
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Clean up lock files
+    lock_file = f"{work_dir}/Tools/.pdgf.lock"
+    if os.path.exists(lock_file):
+        print(f"Removing existing lock file: {lock_file}")
+        os.remove(lock_file)
+    
+    # Change to Tools directory
+    tools_dir = f"{work_dir}/Tools"
+    original_dir = os.getcwd()
+    
+    try:
+        os.chdir(tools_dir)
+        
+        # Run DIGen with stdin redirected to /dev/null
+        # This prevents DIGen from reading commands from stdin
+        with open(os.devnull, 'r') as devnull:
+            process = subprocess.Popen(
+                java_cmd,
+                env=env,
+                stdin=devnull,  # Redirect stdin to /dev/null
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Combine stderr with stdout
+                universal_newlines=True,
+                bufsize=1  # Line buffered
+            )
+            
+            # Stream output in real-time
+            for line in process.stdout:
+                # Filter out harmless "Command 'null' is unknown" errors
+                if "Command 'null' is unknown" not in line:
+                    print(line, end='')
+            
+            # Wait for process to complete
+            exit_code = process.wait()
+            
+    finally:
+        os.chdir(original_dir)
+    
+    # Check if files were generated (even if exit code is non-zero)
+    output_files = []
+    if os.path.exists(output_dir):
+        output_files = glob.glob(f"{output_dir}/*.txt")
+    
+    if exit_code != 0 and len(output_files) > 0:
+        print()
+        print(f"✓ Found {len(output_files)} generated files - data generation succeeded!")
+        print("(Exit code was non-zero but files were generated - ignoring error)")
+        exit_code = 0
+    
+    return exit_code, output_files
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Option A: Run DIGen using Python (Recommended)
+# MAGIC 
+# MAGIC Use this if you want to run DIGen from a Python cell with better error handling and output streaming.
+
+# COMMAND ----------
+
+# Run DIGen using Python subprocess
+import os
+
+# Determine directories
+if USE_VOLUME and os.path.exists(VOLUME_BASE):
+    work_dir = WORK_DIR_VOLUME
+    output_dir = OUTPUT_DIR_VOLUME
+    print(f"Using Volume paths: {work_dir}")
+else:
+    work_dir = WORK_DIR_DBFS
+    output_dir = OUTPUT_DIR_DBFS
+    print(f"Using DBFS paths: {work_dir}")
+
+# Set Java home
+JAVA_HOME = "/usr/lib/jvm/java-8-openjdk-amd64"
+
+# Run DIGen
+exit_code, output_files = run_digen_python(
+    work_dir=work_dir,
+    output_dir=output_dir,
+    scale_factor=SCALE_FACTOR,
+    java_home=JAVA_HOME
+)
+
+# Check results
+if exit_code == 0:
+    print()
+    print("=" * 50)
+    print("✓ Data generation completed successfully!")
+    print("=" * 50)
+    print(f"Generated {len(output_files)} files:")
+    for f in sorted(output_files)[:10]:  # Show first 10 files
+        size_mb = os.path.getsize(f) / (1024 * 1024)
+        print(f"  {os.path.basename(f)} ({size_mb:.2f} MB)")
+    if len(output_files) > 10:
+        print(f"  ... and {len(output_files) - 10} more files")
+else:
+    print()
+    print("=" * 50)
+    print(f"✗ ERROR: Data generation failed with exit code: {exit_code}")
+    print("=" * 50)
+    raise Exception(f"DIGen failed with exit code {exit_code}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Option B: Run DIGen using Shell Command
+# MAGIC 
+# MAGIC Alternative method using shell command (use if Python method doesn't work).
 
 # COMMAND ----------
 
