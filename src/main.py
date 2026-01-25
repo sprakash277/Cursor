@@ -12,32 +12,47 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.utils.gcs_utils import GCSUtils
 from src.utils.performance_logger import PerformanceLogger
+from src.utils.platform_detector import PlatformDetector
 from src.layers.bronze_layer import BronzeLayer
 from src.layers.silver_layer import SilverLayer
 from src.layers.gold_layer import GoldLayer
 from src.tpc_di.load_manager import TPC_DI_LoadManager
 
 
-def create_spark_session(project_id: str, app_name: str = "TPC-DI-Benchmark") -> SparkSession:
+def create_spark_session(project_id: str, app_name: str = "TPC-DI-Benchmark", platform: str = None) -> SparkSession:
     """
-    Create and configure Spark session for Dataproc
+    Create and configure Spark session for Dataproc or Databricks
     
     Args:
         project_id: GCP project ID
         app_name: Spark application name
+        platform: Platform name (auto-detected if None)
         
     Returns:
         Configured SparkSession
     """
-    spark = SparkSession.builder \
-        .appName(app_name) \
-        .config("spark.sql.adaptive.enabled", "true") \
-        .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
-        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-        .getOrCreate()
+    # Detect platform if not provided
+    if platform is None:
+        platform = PlatformDetector.detect()
+    
+    # Get platform-specific config
+    platform_config = PlatformDetector.get_spark_config(platform)
+    
+    # Build Spark session
+    builder = SparkSession.builder.appName(app_name)
+    
+    # Apply platform-specific configurations
+    for key, value in platform_config.items():
+        builder = builder.config(key, value)
+    
+    spark = builder.getOrCreate()
     
     # Configure for GCS
-    GCSUtils.configure_spark_for_gcs(spark, project_id)
+    GCSUtils.configure_spark_for_gcs(spark, project_id, platform)
+    
+    # Log platform info
+    print(f"Running on platform: {platform}")
+    print(f"Spark version: {spark.version}")
     
     return spark
 
@@ -57,20 +72,35 @@ def load_config(config_path: str = "config/config.yaml") -> Dict:
     return config
 
 
-def main(load_type: str = "historical"):
+def main(load_type: str = "historical", platform: str = None):
     """
     Main orchestration function
     
     Args:
         load_type: Type of load - "historical" or "incremental"
+        platform: Platform name (auto-detected if None)
     """
     # Load configuration
     config = load_config()
     
+    # Detect platform if not provided
+    if platform is None:
+        platform = PlatformDetector.detect()
+    
+    # Get project ID based on platform
+    if platform == "databricks":
+        project_id = config.get("databricks", {}).get("project_id") or config.get("dataproc", {}).get("project_id")
+    else:
+        project_id = config.get("dataproc", {}).get("project_id")
+    
+    if not project_id:
+        raise ValueError("Project ID not found in configuration")
+    
     # Initialize Spark
     spark = create_spark_session(
-        project_id=config["dataproc"]["project_id"],
-        app_name=f"TPC-DI-{load_type.title()}-Load"
+        project_id=project_id,
+        app_name=f"TPC-DI-{load_type.title()}-Load",
+        platform=platform
     )
     
     # Initialize utilities
@@ -191,6 +221,13 @@ if __name__ == "__main__":
         choices=["historical", "incremental"],
         help="Type of load to perform"
     )
+    parser.add_argument(
+        "--platform",
+        type=str,
+        default=None,
+        choices=["dataproc", "databricks", "local"],
+        help="Platform to run on (auto-detected if not specified)"
+    )
     
     args = parser.parse_args()
-    main(load_type=args.load_type)
+    main(load_type=args.load_type, platform=args.platform)

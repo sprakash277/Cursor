@@ -1,6 +1,6 @@
-# TPC-DI Benchmark on Google Cloud Dataproc
+# TPC-DI Benchmark: Dataproc vs Databricks
 
-A PySpark project implementing a TPC-DI (TPC Data Integration) benchmark on Google Cloud Dataproc with a three-layer data architecture (Bronze, Silver, Gold) and support for both Historical and Incremental loads.
+A PySpark project implementing a TPC-DI (TPC Data Integration) benchmark on **Google Cloud Dataproc** and **Databricks** with a three-layer data architecture (Bronze, Silver, Gold) and support for both Historical and Incremental loads. The project automatically detects the execution platform and configures accordingly.
 
 ## Architecture
 
@@ -50,6 +50,7 @@ A PySpark project implementing a TPC-DI (TPC Data Integration) benchmark on Goog
 │   │   └── load_manager.py      # Historical/Incremental load manager
 │   ├── utils/
 │   │   ├── gcs_utils.py         # GCS connection utilities
+│   │   ├── platform_detector.py # Platform detection (Dataproc/Databricks)
 │   │   └── performance_logger.py # Performance logging
 │   └── main.py                  # Main orchestration script
 ├── requirements.txt             # Python dependencies
@@ -57,6 +58,8 @@ A PySpark project implementing a TPC-DI (TPC Data Integration) benchmark on Goog
 ```
 
 ## Prerequisites
+
+### For Dataproc
 
 1. **Google Cloud Platform Setup**
    - GCP project with Dataproc API enabled
@@ -71,19 +74,53 @@ A PySpark project implementing a TPC-DI (TPC Data Integration) benchmark on Goog
    export GOOGLE_CLOUD_PROJECT="your-project-id"
    ```
 
-3. **Python Dependencies**
+### For Databricks
+
+1. **Databricks Workspace Setup**
+   - Databricks workspace with cluster access
+   - Unity Catalog enabled (for volume storage)
+   - Volume created for datagen output (recommended for large files)
+   - GCS bucket for data storage
+   - Service account or cluster service account with GCS access
+
+2. **Volume Setup (Recommended)**
+   ```sql
+   -- Create volume for TPC-DI data generation output
+   CREATE VOLUME IF NOT EXISTS main.default.tpc_di_data;
+   ```
+   
+   Or use the Databricks UI:
+   - Navigate to Catalog Explorer
+   - Create a new Volume: `main.default.tpc_di_data`
+
+3. **GCS Access Configuration**
+   - Configure cluster with service account that has GCS access, OR
+   - Set `GOOGLE_APPLICATION_CREDENTIALS` environment variable in cluster config
+
+### Common Prerequisites
+
+1. **Python Dependencies**
    ```bash
    pip install -r requirements.txt
    ```
+   
+2. **TPC-DI DIGen Tools**
+   - Download TPCDI_Tools.zip from: https://www.tpc.org/tpc_documents_current_versions/current_specifications5.asp
+   - For Databricks: Upload to workspace (e.g., `/Workspace/Users/your-email/datagen/`)
 
 ## Configuration
 
 Edit `config/config.yaml` to configure:
 
 - GCS bucket name and paths
-- Dataproc cluster settings
+- **Dataproc** cluster settings (for Dataproc execution)
+- **Databricks** settings (for Databricks execution):
+  - Project ID for GCS access
+  - Volume configuration (catalog, schema, volume name)
 - TPC-DI batch size and checkpointing
 - Logging configuration
+
+The platform is automatically detected, but you can override it using the `--platform` flag.
 
 ## Usage
 
@@ -109,10 +146,27 @@ See `scripts/README.md` for complete Dataproc documentation.
 **For Databricks:**
 ```python
 # Use the Databricks notebook template
-# See scripts/databricks_notebook.py or scripts/DATABRICKS_README.md
+# See scripts/databricks_notebook.py
 ```
 
-See `scripts/DATABRICKS_README.md` for complete Databricks documentation.
+**Key Features for Databricks:**
+- Uses **Volume paths** for datagen output (better performance for large files)
+- Automatically unzips TPC-DI Tools zip file from workspace
+- Uploads generated data directly to GCS
+- Falls back to DBFS if volumes are not available
+
+**Databricks Notebook Setup:**
+1. Import `scripts/databricks_notebook.py` as a Databricks notebook
+2. Update configuration variables:
+   - `TPCDI_ZIP_PATH`: Path to your TPC-DI Tools zip in workspace
+   - `VOLUME_CATALOG`, `VOLUME_SCHEMA`, `VOLUME_NAME`: Your volume configuration
+   - `GCS_BUCKET`, `GCS_RAW_PATH`, `PROJECT_ID`: Your GCS settings
+3. Run the notebook cells sequentially
+
+The notebook will:
+- Extract the TPC-DI Tools zip file
+- Run DIGen with output to volume path (`/Volumes/.../tpc_di_data/output`)
+- Upload generated files to GCS bucket
 
 **Getting DIGen:**
 - Download TPCDI_Tools.zip from: https://www.tpc.org/tpc_documents_current_versions/current_specifications5.asp
@@ -203,9 +257,20 @@ python src/main.py --load-type historical
 python src/main.py --load-type incremental
 ```
 
-## Running on Dataproc
+## Running the Pipeline
 
-### Submit Job to Dataproc Cluster
+### Platform Auto-Detection
+
+The pipeline automatically detects whether it's running on Dataproc or Databricks. You can also explicitly specify the platform:
+
+```bash
+python src/main.py --load-type historical --platform dataproc
+python src/main.py --load-type historical --platform databricks
+```
+
+### Running on Dataproc
+
+#### Submit Job to Existing Cluster
 
 ```bash
 gcloud dataproc jobs submit pyspark \
@@ -216,7 +281,7 @@ gcloud dataproc jobs submit pyspark \
     -- --load-type historical
 ```
 
-### Create and Run on New Cluster
+#### Create and Run on New Cluster
 
 ```bash
 gcloud dataproc clusters create tpc-di-cluster \
@@ -233,6 +298,53 @@ gcloud dataproc jobs submit pyspark \
     -- --load-type historical
 ```
 
+### Running on Databricks
+
+#### Option 1: Databricks Notebook
+
+1. Create a new notebook in your Databricks workspace
+2. Import the code from `src/main.py`
+3. Configure your settings in `config/config.yaml`
+4. Run the notebook
+
+#### Option 2: Databricks Jobs API
+
+```bash
+databricks jobs create --json-file job_config.json
+```
+
+Example `job_config.json`:
+```json
+{
+  "name": "TPC-DI Historical Load",
+  "new_cluster": {
+    "spark_version": "13.3.x-scala2.12",
+    "node_type_id": "i3.xlarge",
+    "num_workers": 4
+  },
+  "libraries": [
+    {"pypi": {"package": "pyspark==3.5.0"}},
+    {"pypi": {"package": "google-cloud-storage==2.14.0"}},
+    {"pypi": {"package": "pyyaml==6.0.1"}}
+  ],
+  "spark_python_task": {
+    "python_file": "dbfs:/path/to/src/main.py",
+    "parameters": ["--load-type", "historical"]
+  }
+}
+```
+
+#### Option 3: Databricks CLI
+
+```bash
+# Upload code to DBFS
+databricks fs cp -r src dbfs:/tpc-di/src
+
+# Run job
+databricks jobs run-now --job-id <job-id> \
+  --python-params '["--load-type", "historical"]'
+```
+
 ## Performance Logging
 
 The project includes comprehensive performance logging that tracks:
@@ -241,8 +353,21 @@ The project includes comprehensive performance logging that tracks:
 - Record counts processed
 - Data throughput (records/sec, MB/sec)
 - Stage-specific metrics
+- Platform-specific optimizations
 
 Logs are written to both console and file (configured in `config.yaml`).
+
+### Platform-Specific Optimizations
+
+**Dataproc:**
+- Adaptive query execution enabled
+- Skew join optimization
+- Local shuffle reader optimization
+
+**Databricks:**
+- Databricks I/O cache enabled
+- Delta Lake optimizations (if using Delta)
+- Auto-compaction enabled
 
 ## TPC-DI Compliance
 
@@ -290,11 +415,94 @@ In Silver layer, add transformations in table config:
 }
 ```
 
+## Dataproc vs Databricks Comparison
+
+### Key Differences
+
+| Feature | Dataproc | Databricks |
+|---------|----------|-----------|
+| **Data Generation** | Uses DBFS or local storage | Uses **Volumes** (recommended) or DBFS |
+| **GCS Access** | Native GCS connector | Built-in `gs://` protocol support |
+| **Performance** | Standard Spark optimizations | Databricks-specific optimizations (I/O cache, Delta) |
+| **Cost** | Pay-per-use cluster | Pay-per-DBU usage |
+| **Setup** | Requires cluster creation | Workspace-based, faster setup |
+
+### When to Use Each Platform
+
+**Use Dataproc if:**
+- You're already using GCP infrastructure
+- You need fine-grained control over cluster configuration
+- Cost optimization through preemptible instances is important
+- You prefer open-source Spark without vendor-specific features
+
+**Use Databricks if:**
+- You need faster development cycles
+- You want built-in collaboration features
+- You're using Delta Lake or other Databricks-specific features
+- You prefer managed Spark with automatic optimizations
+
+### Volume Path Usage (Databricks)
+
+The Databricks notebook uses **Volume paths** for datagen output by default:
+
+- **Volume Path**: `/Volumes/<catalog>/<schema>/<volume_name>/output`
+- **Benefits**: Better performance for large files, faster I/O
+- **Fallback**: Automatically falls back to DBFS if volumes are not available
+
+To configure volumes:
+1. Create a volume in Unity Catalog
+2. Update `VOLUME_CATALOG`, `VOLUME_SCHEMA`, `VOLUME_NAME` in the notebook
+3. Or set `USE_VOLUME = False` to use DBFS paths
+
 ## Troubleshooting
 
-1. **GCS Access Issues**: Verify service account credentials and permissions
-2. **Schema Mismatches**: Ensure table schemas match your data structure
-3. **Performance**: Adjust Spark configurations in `create_spark_session()` based on cluster size
+### Common Issues
+
+1. **GCS Access Issues**
+   - **Dataproc**: Verify service account credentials and permissions
+   - **Databricks**: Check cluster service account or `GOOGLE_APPLICATION_CREDENTIALS` environment variable
+   - Ensure service account has "Storage Object Admin" role on GCS bucket
+
+2. **Schema Mismatches**
+   - Ensure table schemas match your data structure
+   - Check delimiter and header settings in table configurations
+
+3. **Performance Issues**
+   - **Dataproc**: Adjust Spark configurations in `create_spark_session()` based on cluster size
+   - **Databricks**: Enable I/O cache and Delta optimizations (already configured)
+   - Check partition sizes and adjust `batch_size` in config
+
+4. **Databricks Volume Not Found**
+   - Ensure Unity Catalog is enabled
+   - Verify volume exists: `SHOW VOLUMES IN main.default`
+   - Check volume path format: `/Volumes/<catalog>/<schema>/<volume_name>`
+   - The notebook will automatically fall back to DBFS if volumes are unavailable
+
+5. **Platform Detection Issues**
+   - Manually specify platform: `--platform dataproc` or `--platform databricks`
+   - Check environment variables for platform-specific indicators
+
+6. **TPC-DI DIGen Issues (Databricks)**
+   - Ensure Java 8 is installed (notebook handles this)
+   - Verify TPC-DI Tools zip file path is correct
+   - Check that Apache Commons CLI dependency is downloaded
+   - Review DIGen output for specific error messages
+
+## Benchmarking
+
+This project is designed for comparing performance between Dataproc and Databricks:
+
+1. **Generate data** using the same scale factor on both platforms
+2. **Run historical load** and measure:
+   - Total execution time
+   - Throughput (records/sec, MB/sec)
+   - Resource utilization
+3. **Run incremental load** and measure:
+   - Delta processing time
+   - Merge performance
+4. **Compare results** using the performance logs
+
+Performance metrics are logged to both console and file for easy comparison.
 
 ## License
 

@@ -7,7 +7,10 @@ This guide explains how to run the official TPC-DI DIGen tool on Databricks clus
 1. **Databricks Workspace** with a running cluster
 2. **GCS Access** configured (via service account or cluster credentials)
 3. **TPC-DI Tools** - Download from: https://www.tpc.org/tpc_documents_current_versions/current_specifications5.asp
-4. **Java 7+** (usually pre-installed on Databricks clusters)
+4. **Java 8+** (notebook will install if needed)
+5. **Unity Catalog with Volume** (recommended for better performance with large files)
+   - Create volume: `CREATE VOLUME IF NOT EXISTS main.default.tpc_di_data;`
+   - Or use DBFS as fallback (automatically handled)
 
 ## Method 1: Using Databricks Notebook (Recommended)
 
@@ -15,7 +18,7 @@ This guide explains how to run the official TPC-DI DIGen tool on Databricks clus
 
 1. Open your Databricks workspace
 2. Create a new Python notebook
-3. Copy the code from `scripts/databricks_notebook.py` or use the notebook template below
+3. Import `scripts/databricks_notebook.py` as a Databricks notebook
 
 ### Step 2: Configure Variables
 
@@ -25,38 +28,47 @@ SCALE_FACTOR = 1  # 1 = ~1GB, 10 = ~10GB, etc.
 GCS_BUCKET = "your-tpc-di-bucket"
 GCS_RAW_PATH = "raw"
 PROJECT_ID = "your-project-id"
+
+# TPC-DI Tools zip file location in workspace
+TPCDI_ZIP_PATH = "/Workspace/Users/your-email/datagen/TPCDI_Tools.zip"
+
+# Volume configuration (recommended for better performance)
+VOLUME_CATALOG = "main"
+VOLUME_SCHEMA = "default"
+VOLUME_NAME = "tpc_di_data"
+USE_VOLUME = True  # Set to False to use DBFS instead
 ```
+
+**Note:** The notebook uses **Volume paths** by default for better performance with large files. It will automatically fall back to DBFS if volumes are not available.
 
 ### Step 3: Upload TPC-DI Tools
 
-**Option A: Upload via UI**
+**Option A: Upload via UI (Recommended)**
 1. Go to Workspace → Upload Data
-2. Upload `TPCDI_Tools.zip` to `dbfs:/tmp/tpc-di-tools/`
-3. Extract in notebook:
-
-```python
-# MAGIC %sh
-# MAGIC cd /dbfs/tmp/tpc-di-tools
-# MAGIC unzip -q -o TPCDI_Tools.zip
-# MAGIC if [ -d "Tools/PDGF" ]; then mv Tools/PDGF Tools/pdgf; fi
-```
+2. Upload `TPCDI_Tools.zip` to your workspace (e.g., `/Workspace/Users/your-email/datagen/`)
+3. Update `TPCDI_ZIP_PATH` in the notebook to point to the uploaded file
 
 **Option B: Download in Notebook**
 ```python
 # MAGIC %sh
-# MAGIC cd /dbfs/tmp/tpc-di-setup
+# MAGIC cd /tmp
 # MAGIC curl -L -o TPCDI_Tools.zip "YOUR_TPCDI_TOOLS_URL"
-# MAGIC unzip -q -o TPCDI_Tools.zip
-# MAGIC if [ -d "Tools/PDGF" ]; then mv Tools/PDGF Tools/pdgf; fi
+# MAGIC # Then update TPCDI_ZIP_PATH to point to /tmp/TPCDI_Tools.zip
 ```
+
+The notebook will automatically:
+- Extract the zip file to the configured directory (Volume or DBFS)
+- Rename PDGF to pdgf (required by DIGen)
+- Download Apache Commons CLI dependency
+- Set up the environment
 
 ### Step 4: Run DIGen
 
-```python
-# MAGIC %sh
-# MAGIC cd /dbfs/tmp/tpc-di-setup/Tools
-# MAGIC java -Xmx4g -jar DIGen.jar -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
-```
+The notebook includes a cell that runs DIGen with the configured output directory. The output will be written to:
+- **Volume path** (if enabled): `/Volumes/main/default/tpc_di_data/output`
+- **DBFS path** (fallback): `/dbfs/tmp/tpc-di-setup/output`
+
+The notebook handles all the setup automatically.
 
 ### Step 5: Upload to GCS
 
@@ -268,11 +280,18 @@ databricks jobs submit \
 
 ## Performance Tips
 
-1. **Use larger clusters** for higher scale factors
-2. **Increase Java heap**: `-Xmx8g` or higher
-3. **Use DBFS** for persistent storage (`/dbfs/`)
+1. **Use Volume paths** instead of DBFS for better I/O performance with large files
+2. **Use larger clusters** for higher scale factors
+3. **Increase Java heap**: `-Xmx8g` or higher (configured in notebook)
 4. **Monitor cluster metrics** during generation
 5. **Use spot instances** for cost savings (if acceptable)
+
+### Volume vs DBFS
+
+- **Volumes** (`/Volumes/...`): Better performance, faster I/O, recommended for large files
+- **DBFS** (`/dbfs/...`): Persistent storage, good for smaller files, automatically used as fallback
+
+The notebook automatically detects and uses the best available option.
 
 ## Next Steps
 

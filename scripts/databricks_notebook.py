@@ -22,12 +22,39 @@ GCS_RAW_PATH = "raw"  # Path in bucket for raw data
 PROJECT_ID = "your-project-id"  # Your GCP project ID
 
 # TPC-DI Tools zip file location in Databricks workspace
+# Update this path to match your workspace structure
 TPCDI_ZIP_PATH = "/Workspace/Users/sumit.prakash@databricks.com/Cursor/datagen/801FA37E-A4C5-4307-BD70-985A205019ED-TPC-DI-Tool.zip"
 
-# Local directories
-WORK_DIR = "/dbfs/tmp/tpc-di-setup"
-TOOLS_DIR = f"{WORK_DIR}/Tools"
-OUTPUT_DIR = f"{WORK_DIR}/output"
+# Use Volume path for output directory (better performance for large files)
+# Format: /Volumes/<catalog>/<schema>/<volume_name>/<path>
+# Example: /Volumes/main/default/tpc_di_data/output
+VOLUME_CATALOG = "main"  # Update to your catalog
+VOLUME_SCHEMA = "default"  # Update to your schema
+VOLUME_NAME = "tpc_di_data"  # Update to your volume name
+
+# Volume-based directories (recommended for large files)
+VOLUME_BASE = f"/Volumes/{VOLUME_CATALOG}/{VOLUME_SCHEMA}/{VOLUME_NAME}"
+WORK_DIR_VOLUME = f"{VOLUME_BASE}/setup"
+TOOLS_DIR_VOLUME = f"{WORK_DIR_VOLUME}/Tools"
+OUTPUT_DIR_VOLUME = f"{VOLUME_BASE}/output"
+
+# Fallback to DBFS if volumes are not available
+WORK_DIR_DBFS = "/dbfs/tmp/tpc-di-setup"
+TOOLS_DIR_DBFS = f"{WORK_DIR_DBFS}/Tools"
+OUTPUT_DIR_DBFS = f"{WORK_DIR_DBFS}/output"
+
+# Use volume path by default (set to False to use DBFS)
+USE_VOLUME = True
+
+# Set directories based on preference
+if USE_VOLUME:
+    WORK_DIR = WORK_DIR_VOLUME
+    TOOLS_DIR = TOOLS_DIR_VOLUME
+    OUTPUT_DIR = OUTPUT_DIR_VOLUME
+else:
+    WORK_DIR = WORK_DIR_DBFS
+    TOOLS_DIR = TOOLS_DIR_DBFS
+    OUTPUT_DIR = OUTPUT_DIR_DBFS
 
 # COMMAND ----------
 
@@ -61,10 +88,25 @@ OUTPUT_DIR = f"{WORK_DIR}/output"
 # MAGIC export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 # MAGIC export PATH=$JAVA_HOME/bin:$PATH
 # MAGIC 
+# MAGIC # Configuration - use volume path for better performance
+# MAGIC USE_VOLUME=true
+# MAGIC VOLUME_BASE="/Volumes/main/default/tpc_di_data"
+# MAGIC WORK_DIR_VOLUME="${VOLUME_BASE}/setup"
+# MAGIC WORK_DIR_DBFS="/dbfs/tmp/tpc-di-setup"
+# MAGIC 
+# MAGIC # Determine which directory to use
+# MAGIC if [ "$USE_VOLUME" = "true" ] && [ -d "$VOLUME_BASE" ]; then
+# MAGIC   WORK_DIR="$WORK_DIR_VOLUME"
+# MAGIC   echo "Using Volume path: $WORK_DIR"
+# MAGIC else
+# MAGIC   WORK_DIR="$WORK_DIR_DBFS"
+# MAGIC   echo "Using DBFS path: $WORK_DIR"
+# MAGIC fi
+# MAGIC 
 # MAGIC # Create work directories
-# MAGIC mkdir -p /dbfs/tmp/tpc-di-setup
-# MAGIC mkdir -p /dbfs/tmp/tpc-di-setup/Tools
-# MAGIC mkdir -p /dbfs/tmp/tpc-di-setup/output
+# MAGIC mkdir -p "$WORK_DIR"
+# MAGIC mkdir -p "$WORK_DIR/Tools"
+# MAGIC mkdir -p "${WORK_DIR%/*}/output"
 # MAGIC 
 # MAGIC # Copy zip file from workspace to local filesystem for extraction
 # MAGIC ZIP_FILE="/Workspace/Users/sumit.prakash@databricks.com/Cursor/datagen/801FA37E-A4C5-4307-BD70-985A205019ED-TPC-DI-Tool.zip"
@@ -74,8 +116,8 @@ OUTPUT_DIR = f"{WORK_DIR}/output"
 # MAGIC cp "$ZIP_FILE" "$TEMP_ZIP"
 # MAGIC 
 # MAGIC # Extract to work directory
-# MAGIC echo "Extracting TPC-DI Tools..."
-# MAGIC cd /dbfs/tmp/tpc-di-setup
+# MAGIC echo "Extracting TPC-DI Tools to $WORK_DIR..."
+# MAGIC cd "$WORK_DIR"
 # MAGIC unzip -q -o "$TEMP_ZIP"
 # MAGIC 
 # MAGIC # Rename PDGF to pdgf (required by DIGen)
@@ -99,7 +141,7 @@ OUTPUT_DIR = f"{WORK_DIR}/output"
 # MAGIC # Clean up temp file
 # MAGIC rm -f "$TEMP_ZIP"
 # MAGIC 
-# MAGIC echo "TPC-DI Tools setup completed!"
+# MAGIC echo "TPC-DI Tools setup completed in $WORK_DIR!"
 
 # COMMAND ----------
 
@@ -113,9 +155,21 @@ OUTPUT_DIR = f"{WORK_DIR}/output"
 # MAGIC export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 # MAGIC export PATH=$JAVA_HOME/bin:$PATH
 # MAGIC 
+# MAGIC # Use same directory as extraction step
+# MAGIC USE_VOLUME=true
+# MAGIC VOLUME_BASE="/Volumes/main/default/tpc_di_data"
+# MAGIC WORK_DIR_VOLUME="${VOLUME_BASE}/setup"
+# MAGIC WORK_DIR_DBFS="/dbfs/tmp/tpc-di-setup"
+# MAGIC 
+# MAGIC if [ "$USE_VOLUME" = "true" ] && [ -d "$VOLUME_BASE" ]; then
+# MAGIC   WORK_DIR="$WORK_DIR_VOLUME"
+# MAGIC else
+# MAGIC   WORK_DIR="$WORK_DIR_DBFS"
+# MAGIC fi
+# MAGIC 
 # MAGIC # Download Apache Commons CLI dependency (required for DIGen)
-# MAGIC mkdir -p /dbfs/tmp/tpc-di-setup/Tools/lib
-# MAGIC cd /dbfs/tmp/tpc-di-setup/Tools/lib
+# MAGIC mkdir -p "$WORK_DIR/Tools/lib"
+# MAGIC cd "$WORK_DIR/Tools/lib"
 # MAGIC 
 # MAGIC # Download commons-cli
 # MAGIC echo "Downloading Apache Commons CLI..."
@@ -144,11 +198,29 @@ OUTPUT_DIR = f"{WORK_DIR}/output"
 # MAGIC # Set PDG agreement (required by DIGen)
 # MAGIC export PDG_AGREE=YES
 # MAGIC 
+# MAGIC # Use volume path for output (better performance)
+# MAGIC USE_VOLUME=true
+# MAGIC VOLUME_BASE="/Volumes/main/default/tpc_di_data"
+# MAGIC WORK_DIR_VOLUME="${VOLUME_BASE}/setup"
+# MAGIC OUTPUT_DIR_VOLUME="${VOLUME_BASE}/output"
+# MAGIC WORK_DIR_DBFS="/dbfs/tmp/tpc-di-setup"
+# MAGIC OUTPUT_DIR_DBFS="${WORK_DIR_DBFS}/output"
+# MAGIC 
+# MAGIC if [ "$USE_VOLUME" = "true" ] && [ -d "$VOLUME_BASE" ]; then
+# MAGIC   WORK_DIR="$WORK_DIR_VOLUME"
+# MAGIC   OUTPUT_DIR="$OUTPUT_DIR_VOLUME"
+# MAGIC   echo "Using Volume paths for better performance"
+# MAGIC else
+# MAGIC   WORK_DIR="$WORK_DIR_DBFS"
+# MAGIC   OUTPUT_DIR="$OUTPUT_DIR_DBFS"
+# MAGIC   echo "Using DBFS paths"
+# MAGIC fi
+# MAGIC 
 # MAGIC # Navigate to Tools directory
-# MAGIC cd /dbfs/tmp/tpc-di-setup/Tools
+# MAGIC cd "$WORK_DIR/Tools"
 # MAGIC 
 # MAGIC # Build classpath with dependencies
-# MAGIC CLASSPATH="/dbfs/tmp/tpc-di-setup/Tools/DIGen.jar:/dbfs/tmp/tpc-di-setup/Tools/lib/commons-cli-1.4.jar"
+# MAGIC CLASSPATH="$WORK_DIR/Tools/DIGen.jar:$WORK_DIR/Tools/lib/commons-cli-1.4.jar"
 # MAGIC 
 # MAGIC # Main class (Eclipse JAR wrapper)
 # MAGIC MAIN_CLASS="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
@@ -156,8 +228,7 @@ OUTPUT_DIR = f"{WORK_DIR}/output"
 # MAGIC # Scale factor
 # MAGIC SCALE_FACTOR=10
 # MAGIC 
-# MAGIC # Output directory
-# MAGIC OUTPUT_DIR="/dbfs/tmp/tpc-di-setup/output"
+# MAGIC # Create output directory
 # MAGIC mkdir -p "$OUTPUT_DIR"
 # MAGIC 
 # MAGIC echo "=========================================="
@@ -197,8 +268,19 @@ OUTPUT_DIR = f"{WORK_DIR}/output"
 # COMMAND ----------
 
 # MAGIC %sh
-# MAGIC OUTPUT_DIR="/dbfs/tmp/tpc-di-setup/output"
+# MAGIC # Use same output directory as DIGen step
+# MAGIC USE_VOLUME=true
+# MAGIC VOLUME_BASE="/Volumes/main/default/tpc_di_data"
+# MAGIC OUTPUT_DIR_VOLUME="${VOLUME_BASE}/output"
+# MAGIC OUTPUT_DIR_DBFS="/dbfs/tmp/tpc-di-setup/output"
 # MAGIC 
+# MAGIC if [ "$USE_VOLUME" = "true" ] && [ -d "$VOLUME_BASE" ]; then
+# MAGIC   OUTPUT_DIR="$OUTPUT_DIR_VOLUME"
+# MAGIC else
+# MAGIC   OUTPUT_DIR="$OUTPUT_DIR_DBFS"
+# MAGIC fi
+# MAGIC 
+# MAGIC echo "Checking output directory: $OUTPUT_DIR"
 # MAGIC echo "Generated files:"
 # MAGIC echo "=========================================="
 # MAGIC ls -lh "$OUTPUT_DIR"/*.txt 2>/dev/null | awk '{print $9, "(" $5 ")"}'
@@ -221,8 +303,20 @@ import os
 
 dbutils = DBUtils()
 
-# Configuration
-output_dir = "/dbfs/tmp/tpc-di-setup/output"
+# Configuration - use volume path if available
+USE_VOLUME = True
+VOLUME_BASE = "/Volumes/main/default/tpc_di_data"
+OUTPUT_DIR_VOLUME = f"{VOLUME_BASE}/output"
+OUTPUT_DIR_DBFS = "/dbfs/tmp/tpc-di-setup/output"
+
+# Determine output directory
+if USE_VOLUME and os.path.exists(VOLUME_BASE):
+    output_dir = OUTPUT_DIR_VOLUME
+    print(f"Using Volume path: {output_dir}")
+else:
+    output_dir = OUTPUT_DIR_DBFS
+    print(f"Using DBFS path: {output_dir}")
+
 gcs_bucket = "your-tpc-di-bucket"  # Update this
 gcs_path = "raw"  # Update this
 

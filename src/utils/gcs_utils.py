@@ -6,6 +6,8 @@ from pyspark.sql import SparkSession
 import os
 from typing import Optional
 
+from src.utils.platform_detector import PlatformDetector
+
 
 class GCSUtils:
     """Utility class for GCS operations"""
@@ -64,21 +66,41 @@ class GCSUtils:
         return blob.size
     
     @staticmethod
-    def configure_spark_for_gcs(spark: SparkSession, project_id: str):
+    def configure_spark_for_gcs(spark: SparkSession, project_id: str, platform: Optional[str] = None):
         """
         Configure Spark session for GCS access
         
         Args:
             spark: SparkSession instance
             project_id: GCP project ID
+            platform: Platform name (auto-detected if None)
         """
-        # Set GCS connector
-        spark.conf.set("spark.hadoop.google.cloud.auth.service.account.enable", "true")
-        spark.conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-        spark.conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-        spark.conf.set("fs.gs.project.id", project_id)
+        if platform is None:
+            platform = PlatformDetector.detect()
         
-        # Use service account key if provided
-        service_account_key = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        if service_account_key:
-            spark.conf.set("fs.gs.auth.service.account.json.keyfile", service_account_key)
+        if platform == "databricks":
+            # Databricks has built-in GCS support via gs:// protocol
+            # Just set the project ID if needed
+            spark.conf.set("fs.gs.project.id", project_id)
+            
+            # Use service account key if provided
+            service_account_key = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            if service_account_key:
+                spark.conf.set("fs.gs.auth.service.account.json.keyfile", service_account_key)
+            else:
+                # Databricks can use cluster service account or user credentials
+                # Check if using cluster service account
+                cluster_service_account = os.getenv("DATABRICKS_CLUSTER_SERVICE_ACCOUNT")
+                if cluster_service_account:
+                    spark.conf.set("fs.gs.auth.service.account.email", cluster_service_account)
+        else:
+            # Dataproc or local - use GCS connector
+            spark.conf.set("spark.hadoop.google.cloud.auth.service.account.enable", "true")
+            spark.conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+            spark.conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
+            spark.conf.set("fs.gs.project.id", project_id)
+            
+            # Use service account key if provided
+            service_account_key = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            if service_account_key:
+                spark.conf.set("fs.gs.auth.service.account.json.keyfile", service_account_key)

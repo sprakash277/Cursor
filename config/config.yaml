@@ -10,6 +10,14 @@ dataproc:
   region: "us-central1"
   project_id: "your-project-id"
 
+databricks:
+  project_id: "your-project-id"  # GCP project ID for GCS access
+  workspace_url: "https://your-workspace.cloud.databricks.com"
+  cluster_id: "your-cluster-id"  # Optional: for job submission
+  volume_catalog: "main"  # Catalog for volume storage
+  volume_schema: "default"  # Schema for volume storage
+  volume_name: "tpc_di_data"  # Volume name for datagen output
+
 tpc_di:
   batch_size: 10000
   enable_checkpointing: true
