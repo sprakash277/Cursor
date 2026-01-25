@@ -267,18 +267,20 @@ else:
 # MAGIC echo "Starting data generation (this may take a while)..."
 # MAGIC echo "Note: PDG_AGREE=YES is set to automatically accept license"
 # MAGIC echo ""
-# MAGIC echo "IMPORTANT: Do NOT use 'yes YES |' pipe - it causes errors!"
-# MAGIC echo "The PDG_AGREE environment variable is sufficient."
+# MAGIC echo "IMPORTANT: Redirecting stdin to /dev/null to prevent DIGen from reading shell commands"
 # MAGIC echo ""
 # MAGIC 
-# MAGIC # Run DIGen WITHOUT piping YES (PDG_AGREE env var handles license agreement)
-# MAGIC # The environment variable PDG_AGREE=YES should be sufficient
+# MAGIC # Run DIGen with stdin redirected to /dev/null to prevent interactive mode
+# MAGIC # This prevents DIGen from reading subsequent shell commands as input
+# MAGIC # PDG_AGREE=YES environment variable handles license agreement
 # MAGIC # Use -cp WITHOUT -jar to include external dependencies
-# MAGIC java -Xmx8g -cp "$CLASSPATH" $MAIN_CLASS -o "$OUTPUT_DIR/" -sf $SCALE_FACTOR
+# MAGIC java -Xmx8g -cp "$CLASSPATH" $MAIN_CLASS -o "$OUTPUT_DIR/" -sf $SCALE_FACTOR < /dev/null
 # MAGIC 
-# MAGIC EXIT_CODE=$?
+# MAGIC # Capture exit code immediately after Java command
+# MAGIC DIGEN_EXIT_CODE=$?
 # MAGIC 
-# MAGIC if [ $EXIT_CODE -eq 0 ]; then
+# MAGIC # Check exit code
+# MAGIC if [ $DIGEN_EXIT_CODE -eq 0 ]; then
 # MAGIC   echo ""
 # MAGIC   echo "=========================================="
 # MAGIC   echo "✓ Data generation completed successfully!"
@@ -286,7 +288,7 @@ else:
 # MAGIC else
 # MAGIC   echo ""
 # MAGIC   echo "=========================================="
-# MAGIC   echo "✗ ERROR: Data generation failed with exit code: $EXIT_CODE"
+# MAGIC   echo "✗ ERROR: Data generation failed with exit code: $DIGEN_EXIT_CODE"
 # MAGIC   echo "=========================================="
 # MAGIC   echo ""
 # MAGIC   echo "Troubleshooting tips:"
@@ -295,7 +297,7 @@ else:
 # MAGIC   echo "3. Check output directory permissions: ls -ld $OUTPUT_DIR"
 # MAGIC   echo "4. Check for lock files: ls -la $WORK_DIR/Tools/.pdgf*"
 # MAGIC   echo ""
-# MAGIC   exit $EXIT_CODE
+# MAGIC   exit $DIGEN_EXIT_CODE
 # MAGIC fi
 
 # COMMAND ----------

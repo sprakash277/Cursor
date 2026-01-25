@@ -2,24 +2,25 @@
 
 ## Common Errors and Solutions
 
-### Error: "Command 'YES' is unknown"
+### Error: "Command 'YES' is unknown" or "Command 'EXIT_CODE=$?' is unknown"
 
-**Problem:** The `yes YES |` pipe is sending "YES" as commands to DIGen's interactive shell, not as input to a prompt.
+**Problem:** DIGen is running in interactive mode and reading subsequent shell commands from stdin as commands to its interactive shell.
 
 **Solution:** 
-- Remove the `yes YES |` pipe
+- Redirect stdin to `/dev/null` when running DIGen
 - Set `PDG_AGREE=YES` as an environment variable BEFORE running DIGen
-- The environment variable is sufficient for license agreement
+- The environment variable handles license agreement, and redirecting stdin prevents interactive mode
 
 **Correct command:**
 ```bash
 export PDG_AGREE=YES
-java -Xmx8g -cp "DIGen.jar:lib/commons-cli-1.4.jar" org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader -o /output/ -sf 1
+java -Xmx8g -cp "DIGen.jar:lib/commons-cli-1.4.jar" org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader -o /output/ -sf 1 < /dev/null
 ```
 
-**Incorrect command (DO NOT USE):**
+**Incorrect commands (DO NOT USE):**
 ```bash
-yes YES | java -Xmx8g -cp "..." ...  # This causes the error!
+yes YES | java -Xmx8g -cp "..." ...  # This causes errors!
+java -Xmx8g -cp "..." ...  # Without < /dev/null, reads shell commands as input!
 ```
 
 ### Error: "Cannot start again while data generation process is already running"
@@ -73,12 +74,31 @@ if [ -d "PDGF" ]; then
 fi
 ```
 
+## Why Redirect Stdin?
+
+DIGen runs in an interactive mode by default and reads from stdin. When you run it in a shell script, any commands that come after the Java command (like `EXIT_CODE=$?`, `if`, `echo`, etc.) get read by DIGen's interactive shell as commands, causing errors like:
+- "Command 'EXIT_CODE=$?' is unknown"
+- "Command 'if' is unknown"
+- "Command 'echo' is unknown"
+
+**Solution:** Redirect stdin to `/dev/null`:
+```bash
+java ... < /dev/null
+```
+
+This prevents DIGen from reading anything from stdin, forcing it to run non-interactively.
+
 ## Best Practices
 
 ### 1. Always Set PDG_AGREE Before Running
 ```bash
 export PDG_AGREE=YES
 # Then run DIGen
+```
+
+### 2. Always Redirect Stdin
+```bash
+java ... < /dev/null
 ```
 
 ### 2. Use Absolute Paths for Classpath
@@ -157,14 +177,16 @@ CLASSPATH="$WORK_DIR/Tools/DIGen.jar:$WORK_DIR/Tools/lib/commons-cli-1.4.jar"
 # Main class
 MAIN_CLASS="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
 
-# Run DIGen (NO pipe, NO -jar flag)
+# Run DIGen (NO pipe, NO -jar flag, redirect stdin to prevent interactive mode)
 echo "Running DIGen with scale factor: $SCALE_FACTOR"
 echo "Output directory: $OUTPUT_DIR"
 echo "PDG_AGREE: $PDG_AGREE"
 
-java -Xmx8g -cp "$CLASSPATH" $MAIN_CLASS -o "$OUTPUT_DIR/" -sf $SCALE_FACTOR
+# CRITICAL: Redirect stdin to /dev/null to prevent DIGen from reading shell commands
+java -Xmx8g -cp "$CLASSPATH" $MAIN_CLASS -o "$OUTPUT_DIR/" -sf $SCALE_FACTOR < /dev/null
 
-if [ $? -eq 0 ]; then
+DIGEN_EXIT=$?
+if [ $DIGEN_EXIT -eq 0 ]; then
   echo "✓ Data generation completed successfully!"
   ls -lh "$OUTPUT_DIR"/*.txt
 else
