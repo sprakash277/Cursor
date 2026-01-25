@@ -195,7 +195,7 @@ else:
 # MAGIC export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 # MAGIC export PATH=$JAVA_HOME/bin:$PATH
 # MAGIC 
-# MAGIC # Set PDG agreement (required by DIGen)
+# MAGIC # Set PDG agreement (required by DIGen) - must be set BEFORE running
 # MAGIC export PDG_AGREE=YES
 # MAGIC 
 # MAGIC # Use volume path for output (better performance)
@@ -231,6 +231,29 @@ else:
 # MAGIC # Create output directory
 # MAGIC mkdir -p "$OUTPUT_DIR"
 # MAGIC 
+# MAGIC # Clean up any existing lock files or processes
+# MAGIC echo "Cleaning up any existing DIGen processes or lock files..."
+# MAGIC 
+# MAGIC # Remove lock files
+# MAGIC LOCK_FILE="$WORK_DIR/Tools/.pdgf.lock"
+# MAGIC if [ -f "$LOCK_FILE" ]; then
+# MAGIC   echo "  Removing existing lock file: $LOCK_FILE"
+# MAGIC   rm -f "$LOCK_FILE"
+# MAGIC fi
+# MAGIC 
+# MAGIC # Check for any running Java processes with DIGen
+# MAGIC JAVA_PIDS=$(pgrep -f "DIGen.jar" || true)
+# MAGIC if [ -n "$JAVA_PIDS" ]; then
+# MAGIC   echo "  Warning: Found running DIGen processes: $JAVA_PIDS"
+# MAGIC   echo "  Consider waiting for them to finish or killing them manually"
+# MAGIC fi
+# MAGIC 
+# MAGIC # Ensure output directory is writable
+# MAGIC if [ ! -w "$OUTPUT_DIR" ]; then
+# MAGIC   echo "  Error: Output directory is not writable: $OUTPUT_DIR"
+# MAGIC   exit 1
+# MAGIC fi
+# MAGIC 
 # MAGIC echo "=========================================="
 # MAGIC echo "Running TPC-DI DIGen"
 # MAGIC echo "=========================================="
@@ -238,16 +261,24 @@ else:
 # MAGIC echo "Output Directory: $OUTPUT_DIR"
 # MAGIC echo "Classpath: $CLASSPATH"
 # MAGIC echo "Main Class: $MAIN_CLASS"
+# MAGIC echo "PDG_AGREE: $PDG_AGREE"
 # MAGIC echo "=========================================="
 # MAGIC echo ""
 # MAGIC echo "Starting data generation (this may take a while)..."
+# MAGIC echo "Note: PDG_AGREE=YES is set to automatically accept license"
+# MAGIC echo ""
+# MAGIC echo "IMPORTANT: Do NOT use 'yes YES |' pipe - it causes errors!"
+# MAGIC echo "The PDG_AGREE environment variable is sufficient."
+# MAGIC echo ""
 # MAGIC 
-# MAGIC # Run DIGen
-# MAGIC # Use yes YES| to automatically agree to license
+# MAGIC # Run DIGen WITHOUT piping YES (PDG_AGREE env var handles license agreement)
+# MAGIC # The environment variable PDG_AGREE=YES should be sufficient
 # MAGIC # Use -cp WITHOUT -jar to include external dependencies
-# MAGIC yes YES | java -Xmx8g -cp "$CLASSPATH" $MAIN_CLASS -o "$OUTPUT_DIR/" -sf $SCALE_FACTOR
+# MAGIC java -Xmx8g -cp "$CLASSPATH" $MAIN_CLASS -o "$OUTPUT_DIR/" -sf $SCALE_FACTOR
 # MAGIC 
-# MAGIC if [ $? -eq 0 ]; then
+# MAGIC EXIT_CODE=$?
+# MAGIC 
+# MAGIC if [ $EXIT_CODE -eq 0 ]; then
 # MAGIC   echo ""
 # MAGIC   echo "=========================================="
 # MAGIC   echo "✓ Data generation completed successfully!"
@@ -255,9 +286,16 @@ else:
 # MAGIC else
 # MAGIC   echo ""
 # MAGIC   echo "=========================================="
-# MAGIC   echo "✗ ERROR: Data generation failed!"
+# MAGIC   echo "✗ ERROR: Data generation failed with exit code: $EXIT_CODE"
 # MAGIC   echo "=========================================="
-# MAGIC   exit 1
+# MAGIC   echo ""
+# MAGIC   echo "Troubleshooting tips:"
+# MAGIC   echo "1. Check if PDG_AGREE=YES is set: echo \$PDG_AGREE"
+# MAGIC   echo "2. Verify Java version: java -version"
+# MAGIC   echo "3. Check output directory permissions: ls -ld $OUTPUT_DIR"
+# MAGIC   echo "4. Check for lock files: ls -la $WORK_DIR/Tools/.pdgf*"
+# MAGIC   echo ""
+# MAGIC   exit $EXIT_CODE
 # MAGIC fi
 
 # COMMAND ----------
