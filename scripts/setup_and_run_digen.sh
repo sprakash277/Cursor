@@ -166,7 +166,19 @@ download_tpcdi_tools() {
 # Show DIGen help
 show_digen_help() {
     log_info "DIGen command line options:"
-    java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
+    # Build classpath with dependencies
+    CLASSPATH="${DIGEN_DIR}/DIGen.jar"
+    if ls "${DIGEN_DIR}"/lib/commons-cli-*.jar 2>/dev/null | head -n 1 | read COMMONS_CLI_JAR; then
+        CLASSPATH="${CLASSPATH}:${COMMONS_CLI_JAR}"
+    fi
+    
+    # Try with classpath and -jar (reads main class from manifest)
+    if [ "${CLASSPATH}" != "${DIGEN_DIR}/DIGen.jar" ]; then
+        java -cp "${CLASSPATH}" -jar "${DIGEN_DIR}/DIGen.jar" -h || \
+        java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
+    else
+        java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
+    fi
 }
 
 # Run DIGen to generate data
@@ -183,7 +195,30 @@ run_digen() {
     log_info "Starting data generation (this may take a while)..."
     
     cd "${DIGEN_DIR}"
-    java -jar DIGen.jar -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}"
+    
+    # Build classpath with dependencies
+    CLASSPATH="${DIGEN_DIR}/DIGen.jar"
+    
+    # Add Commons CLI to classpath if available
+    if [ -f "${DIGEN_DIR}/lib/commons-cli-1.4.jar" ]; then
+        CLASSPATH="${CLASSPATH}:${DIGEN_DIR}/lib/commons-cli-1.4.jar"
+    elif [ -f "${DIGEN_DIR}/lib/commons-cli-1.5.0.jar" ]; then
+        CLASSPATH="${CLASSPATH}:${DIGEN_DIR}/lib/commons-cli-1.5.0.jar"
+    elif ls "${DIGEN_DIR}"/lib/commons-cli-*.jar 2>/dev/null | head -n 1 | read COMMONS_CLI_JAR; then
+        CLASSPATH="${CLASSPATH}:${COMMONS_CLI_JAR}"
+    fi
+    
+    # Try running with classpath first (for dependencies)
+    if [ "${CLASSPATH}" != "${DIGEN_DIR}/DIGen.jar" ]; then
+        log_info "Running DIGen with classpath: ${CLASSPATH}"
+        # Use -jar which automatically reads Main-Class from manifest
+        # The classpath will include the dependency JARs
+        java -Xmx4g -cp "${CLASSPATH}" -jar "${DIGEN_DIR}/DIGen.jar" -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}"
+    else
+        # Fallback to standard jar execution
+        log_warn "Running without explicit classpath (may fail if dependencies missing)"
+        java -Xmx4g -jar DIGen.jar -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}"
+    fi
     
     if [ $? -eq 0 ]; then
         log_info "Data generation completed successfully!"

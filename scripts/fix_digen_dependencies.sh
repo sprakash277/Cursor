@@ -43,7 +43,10 @@ if [ -f "${COMMONS_CLI_JAR}" ]; then
     log_info "  Location: ${COMMONS_CLI_JAR}"
     log_info ""
     log_info "Now run DIGen with classpath:"
-    log_info "  java -cp ${DIGEN_DIR}/DIGen.jar:${COMMONS_CLI_JAR} -jar ${DIGEN_DIR}/DIGen.jar -o <output_dir> -sf <scale_factor>"
+    log_info "  cd ${DIGEN_DIR}"
+    log_info "  java -Xmx4g -cp DIGen.jar:lib/commons-cli-${COMMONS_CLI_VERSION}.jar -jar DIGen.jar -o <output_dir> -sf <scale_factor>"
+    log_info ""
+    log_info "Note: Using -jar reads the Main-Class from the JAR manifest automatically."
 else
     log_error "Download failed. Please download manually from:"
     log_error "  ${COMMONS_CLI_URL}"

@@ -48,6 +48,7 @@ java -cp DIGen.jar:lib/commons-cli-1.4.jar -jar DIGen.jar -o /output/ -sf 1
 # MAGIC 
 # MAGIC cd /dbfs/tmp/tpc-di-setup/Tools
 # MAGIC CLASSPATH="DIGen.jar:lib/commons-cli-1.4.jar"
+# MAGIC # Use -jar which reads Main-Class from manifest automatically
 # MAGIC java -Xmx4g -cp "$CLASSPATH" -jar DIGen.jar -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
 ```
 
@@ -177,17 +178,46 @@ Out of disk space
 - Use larger disk for cluster
 - Generate in batches
 
-### 9. ClassNotFoundException with Different Class
+### 9. ClassNotFoundException: org.tpc.di.DIGen
+
+**Error:**
+```
+Caused by: java.lang.ClassNotFoundException: org.tpc.di.DIGen
+```
+
+**Cause:**
+The main class name is incorrect. DIGen.jar uses a manifest to specify the main class.
+
+**Solution:**
+Use `-jar` flag which automatically reads the Main-Class from the JAR manifest:
+
+```bash
+# Correct way - use -jar with classpath
+java -cp DIGen.jar:lib/commons-cli-1.4.jar -jar DIGen.jar -o /output/ -sf 1
+
+# NOT this (wrong main class):
+# java -cp DIGen.jar:lib/commons-cli-1.4.jar org.tpc.di.DIGen -o /output/ -sf 1
+```
+
+The `-jar` flag tells Java to:
+1. Read the Main-Class from META-INF/MANIFEST.MF
+2. Use that class as the entry point
+3. Include the JAR itself in the classpath
+
+### 10. ClassNotFoundException with Different Class
 
 If you see a different missing class, check what's needed:
 
 ```bash
 # Extract JAR to see dependencies
 unzip -l DIGen.jar | grep -i "META-INF/MANIFEST.MF"
-unzip -p DIGen.jar META-INF/MANIFEST.MF | grep -i "class-path"
+unzip -p DIGen.jar META-INF/MANIFEST.MF
 
 # Check what classes are referenced
 jar tf DIGen.jar | grep -i "import\|require"
+
+# Find the actual main class
+unzip -p DIGen.jar META-INF/MANIFEST.MF | grep -i "Main-Class"
 ```
 
 ### 10. Script Execution Fails on Databricks

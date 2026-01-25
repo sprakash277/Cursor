@@ -190,13 +190,33 @@ download_tpcdi_tools() {
     download_commons_cli
 }
 
+# Extract main class from JAR manifest
+get_main_class() {
+    if [ -f "${DIGEN_DIR}/DIGen.jar" ]; then
+        # Try to extract Main-Class from manifest
+        MAIN_CLASS=$(unzip -p "${DIGEN_DIR}/DIGen.jar" META-INF/MANIFEST.MF 2>/dev/null | grep -i "Main-Class:" | cut -d' ' -f2 | tr -d '\r' | tr -d '\n')
+        if [ -n "${MAIN_CLASS}" ]; then
+            echo "${MAIN_CLASS}"
+            return 0
+        fi
+    fi
+    # Default - use -jar which reads manifest automatically
+    echo ""
+    return 1
+}
+
 # Show DIGen help
 show_digen_help() {
     log_info "DIGen command line options:"
-    # Try with classpath first, fallback to jar if classpath fails
-    if [ -f "${DIGEN_DIR}/lib/commons-cli-1.4.jar" ] || [ -f "${DIGEN_DIR}/lib/commons-cli-1.5.0.jar" ]; then
-        COMMONS_CLI_JAR=$(ls "${DIGEN_DIR}"/lib/commons-cli-*.jar 2>/dev/null | head -n 1)
-        java -cp "${DIGEN_DIR}/DIGen.jar:${COMMONS_CLI_JAR}" org.tpc.di.DIGen -h || \
+    # Build classpath with dependencies
+    CLASSPATH="${DIGEN_DIR}/DIGen.jar"
+    if ls "${DIGEN_DIR}"/lib/commons-cli-*.jar 2>/dev/null | head -n 1 | read COMMONS_CLI_JAR; then
+        CLASSPATH="${CLASSPATH}:${COMMONS_CLI_JAR}"
+    fi
+    
+    # Try with classpath and -jar (reads main class from manifest)
+    if [ "${CLASSPATH}" != "${DIGEN_DIR}/DIGen.jar" ]; then
+        java -cp "${CLASSPATH}" -jar "${DIGEN_DIR}/DIGen.jar" -h || \
         java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
     else
         java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
@@ -233,9 +253,8 @@ run_digen() {
     # Try running with classpath first (for dependencies)
     if [ "${CLASSPATH}" != "${DIGEN_DIR}/DIGen.jar" ]; then
         log_info "Running DIGen with classpath: ${CLASSPATH}"
-        # Try to find the main class - common patterns
-        java -Xmx4g -cp "${CLASSPATH}" org.tpc.di.DIGen -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}" || \
-        java -Xmx4g -cp "${CLASSPATH}" DIGen -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}" || \
+        # Use -jar which automatically reads Main-Class from manifest
+        # The classpath will include the dependency JARs
         java -Xmx4g -cp "${CLASSPATH}" -jar "${DIGEN_DIR}/DIGen.jar" -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}"
     else
         # Fallback to standard jar execution

@@ -95,7 +95,8 @@ TPCDI_TOOLS_URL = ""  # Leave empty if tools are already in DBFS
 # MAGIC CLASSPATH="DIGen.jar:lib/commons-cli-1.4.jar"
 # MAGIC 
 # MAGIC # Show DIGen help
-# MAGIC java -cp "$CLASSPATH" -jar DIGen.jar -h || java -cp "$CLASSPATH" org.tpc.di.DIGen -h
+# MAGIC # Use -jar which reads Main-Class from manifest automatically
+# MAGIC java -cp "$CLASSPATH" -jar DIGen.jar -h
 # MAGIC 
 # MAGIC # Run DIGen (adjust scale factor as needed)
 # MAGIC # java -Xmx4g -cp "$CLASSPATH" -jar DIGen.jar -o /dbfs/tmp/tpc-di-setup/output/ -sf 1

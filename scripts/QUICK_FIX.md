@@ -33,9 +33,9 @@ cd Tools/lib
 curl -L -o commons-cli-1.4.jar \
   https://repo1.maven.org/maven2/commons-cli/commons-cli/1.4/commons-cli-1.4.jar
 
-# 3. Run DIGen with classpath
+# 3. Run DIGen with classpath (use -jar to read Main-Class from manifest)
 cd ..
-java -cp DIGen.jar:lib/commons-cli-1.4.jar -jar DIGen.jar -o /output/ -sf 1
+java -Xmx4g -cp DIGen.jar:lib/commons-cli-1.4.jar -jar DIGen.jar -o /output/ -sf 1
 ```
 
 ### Using the Fix Script
@@ -59,6 +59,7 @@ java -cp DIGen.jar:lib/commons-cli-1.4.jar -jar DIGen.jar -o /output/ -sf 1
 # MAGIC # Run with classpath
 # MAGIC cd /dbfs/tmp/tpc-di-setup/Tools
 # MAGIC CLASSPATH="DIGen.jar:lib/commons-cli-1.4.jar"
+# MAGIC # Use -jar which reads Main-Class from manifest automatically
 # MAGIC java -Xmx4g -cp "$CLASSPATH" -jar DIGen.jar -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
 ```
 
@@ -67,8 +68,10 @@ java -cp DIGen.jar:lib/commons-cli-1.4.jar -jar DIGen.jar -o /output/ -sf 1
 The updated scripts now:
 - ✅ Automatically download Apache Commons CLI if missing
 - ✅ Build proper classpath with dependencies
-- ✅ Try multiple execution methods for compatibility
+- ✅ Use `-jar` flag which reads Main-Class from manifest (no need to specify class name)
 - ✅ Provide clear error messages if download fails
+
+**Important:** Always use `-jar` flag with DIGen.jar. This tells Java to read the Main-Class from the JAR's manifest file automatically. Don't try to specify the main class name directly.
 
 ## Verification
 
