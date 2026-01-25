@@ -77,13 +77,28 @@ TPCDI_TOOLS_URL = ""  # Leave empty if tools are already in DBFS
 # COMMAND ----------
 
 # MAGIC %sh
+# MAGIC # Download Apache Commons CLI dependency (required for DIGen)
+# MAGIC mkdir -p /dbfs/tmp/tpc-di-setup/Tools/lib
+# MAGIC cd /dbfs/tmp/tpc-di-setup/Tools/lib
+# MAGIC 
+# MAGIC # Download commons-cli
+# MAGIC curl -L -o commons-cli-1.4.jar https://repo1.maven.org/maven2/commons-cli/commons-cli/1.4/commons-cli-1.4.jar
+# MAGIC 
+# MAGIC echo "Apache Commons CLI downloaded"
+
+# COMMAND ----------
+
+# MAGIC %sh
 # MAGIC cd /dbfs/tmp/tpc-di-setup/Tools
 # MAGIC 
+# MAGIC # Build classpath with dependencies
+# MAGIC CLASSPATH="DIGen.jar:lib/commons-cli-1.4.jar"
+# MAGIC 
 # MAGIC # Show DIGen help
-# MAGIC java -jar DIGen.jar -h
+# MAGIC java -cp "$CLASSPATH" -jar DIGen.jar -h || java -cp "$CLASSPATH" org.tpc.di.DIGen -h
 # MAGIC 
 # MAGIC # Run DIGen (adjust scale factor as needed)
-# MAGIC # java -Xmx4g -jar DIGen.jar -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
+# MAGIC # java -Xmx4g -cp "$CLASSPATH" -jar DIGen.jar -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
 
 # COMMAND ----------
 

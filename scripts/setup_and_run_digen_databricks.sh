@@ -81,6 +81,53 @@ check_java() {
     fi
 }
 
+# Download Apache Commons CLI dependency
+download_commons_cli() {
+    log_info "Checking for Apache Commons CLI dependency..."
+    
+    COMMONS_CLI_JAR="${DIGEN_DIR}/lib/commons-cli-1.4.jar"
+    COMMONS_CLI_URL="https://repo1.maven.org/maven2/commons-cli/commons-cli/1.4/commons-cli-1.4.jar"
+    
+    # Check if already exists
+    if [ -f "${COMMONS_CLI_JAR}" ]; then
+        log_info "Apache Commons CLI found at ${COMMONS_CLI_JAR}"
+        return 0
+    fi
+    
+    # Create lib directory
+    mkdir -p "${DIGEN_DIR}/lib"
+    
+    log_info "Downloading Apache Commons CLI..."
+    if command -v curl &> /dev/null; then
+        curl -L -o "${COMMONS_CLI_JAR}" "${COMMONS_CLI_URL}" || {
+            log_warn "Failed to download from Maven Central, trying alternative..."
+            # Try alternative version
+            COMMONS_CLI_URL="https://repo1.maven.org/maven2/commons-cli/commons-cli/1.5.0/commons-cli-1.5.0.jar"
+            curl -L -o "${COMMONS_CLI_JAR}" "${COMMONS_CLI_URL}" || {
+                log_error "Failed to download Apache Commons CLI"
+                return 1
+            }
+        }
+    elif command -v wget &> /dev/null; then
+        wget -q "${COMMONS_CLI_URL}" -O "${COMMONS_CLI_JAR}" || {
+            log_error "Failed to download Apache Commons CLI"
+            return 1
+        }
+    else
+        log_error "Neither curl nor wget found. Cannot download dependency."
+        log_info "Please manually download commons-cli-1.4.jar to ${DIGEN_DIR}/lib/"
+        return 1
+    fi
+    
+    if [ -f "${COMMONS_CLI_JAR}" ]; then
+        log_info "Apache Commons CLI downloaded successfully"
+        return 0
+    else
+        log_error "Apache Commons CLI download failed"
+        return 1
+    fi
+}
+
 # Download TPC-DI Tools
 download_tpcdi_tools() {
     log_info "Setting up TPC-DI DIGen..."
@@ -138,12 +185,22 @@ download_tpcdi_tools() {
     fi
     
     log_info "DIGen.jar found at ${DIGEN_DIR}/DIGen.jar"
+    
+    # Download required dependencies
+    download_commons_cli
 }
 
 # Show DIGen help
 show_digen_help() {
     log_info "DIGen command line options:"
-    java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
+    # Try with classpath first, fallback to jar if classpath fails
+    if [ -f "${DIGEN_DIR}/lib/commons-cli-1.4.jar" ] || [ -f "${DIGEN_DIR}/lib/commons-cli-1.5.0.jar" ]; then
+        COMMONS_CLI_JAR=$(ls "${DIGEN_DIR}"/lib/commons-cli-*.jar 2>/dev/null | head -n 1)
+        java -cp "${DIGEN_DIR}/DIGen.jar:${COMMONS_CLI_JAR}" org.tpc.di.DIGen -h || \
+        java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
+    else
+        java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
+    fi
 }
 
 # Run DIGen to generate data
@@ -160,7 +217,31 @@ run_digen() {
     log_info "Starting data generation (this may take a while)..."
     
     cd "${DIGEN_DIR}"
-    java -Xmx4g -jar DIGen.jar -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}"
+    
+    # Build classpath with dependencies
+    CLASSPATH="${DIGEN_DIR}/DIGen.jar"
+    
+    # Add Commons CLI to classpath if available
+    if [ -f "${DIGEN_DIR}/lib/commons-cli-1.4.jar" ]; then
+        CLASSPATH="${CLASSPATH}:${DIGEN_DIR}/lib/commons-cli-1.4.jar"
+    elif [ -f "${DIGEN_DIR}/lib/commons-cli-1.5.0.jar" ]; then
+        CLASSPATH="${CLASSPATH}:${DIGEN_DIR}/lib/commons-cli-1.5.0.jar"
+    elif ls "${DIGEN_DIR}"/lib/commons-cli-*.jar 2>/dev/null | head -n 1 | read COMMONS_CLI_JAR; then
+        CLASSPATH="${CLASSPATH}:${COMMONS_CLI_JAR}"
+    fi
+    
+    # Try running with classpath first (for dependencies)
+    if [ "${CLASSPATH}" != "${DIGEN_DIR}/DIGen.jar" ]; then
+        log_info "Running DIGen with classpath: ${CLASSPATH}"
+        # Try to find the main class - common patterns
+        java -Xmx4g -cp "${CLASSPATH}" org.tpc.di.DIGen -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}" || \
+        java -Xmx4g -cp "${CLASSPATH}" DIGen -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}" || \
+        java -Xmx4g -cp "${CLASSPATH}" -jar "${DIGEN_DIR}/DIGen.jar" -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}"
+    else
+        # Fallback to standard jar execution
+        log_warn "Running without explicit classpath (may fail if dependencies missing)"
+        java -Xmx4g -jar DIGen.jar -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}"
+    fi
     
     if [ $? -eq 0 ]; then
         log_info "Data generation completed successfully!"
@@ -252,6 +333,13 @@ main() {
     
     # Setup and run
     download_tpcdi_tools
+    
+    # Verify dependencies
+    if ! ls "${DIGEN_DIR}"/lib/commons-cli-*.jar 2>/dev/null | grep -q .; then
+        log_warn "Apache Commons CLI not found. Attempting to download..."
+        download_commons_cli
+    fi
+    
     show_digen_help
     run_digen
     upload_to_gcs
