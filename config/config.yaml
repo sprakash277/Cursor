@@ -1,0 +1,20 @@
+gcs:
+  bucket_name: "your-tpc-di-bucket"
+  raw_data_path: "raw/"
+  bronze_path: "bronze/"
+  silver_path: "silver/"
+  gold_path: "gold/"
+  
+dataproc:
+  cluster_name: "tpc-di-cluster"
+  region: "us-central1"
+  project_id: "your-project-id"
+
+tpc_di:
+  batch_size: 10000
+  enable_checkpointing: true
+  checkpoint_path: "checkpoints/"
+
+logging:
+  level: "INFO"
+  performance_log_path: "logs/performance.log"
