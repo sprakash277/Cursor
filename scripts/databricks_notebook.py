@@ -260,31 +260,57 @@ def run_digen_python(work_dir, output_dir, scale_factor=10, java_home="/usr/lib/
     tools_dir = f"{work_dir}/Tools"
     original_dir = os.getcwd()
     
+    # Create a log file for output to avoid pipe issues
+    log_file = f"{output_dir}/digen.log"
+    os.makedirs(output_dir, exist_ok=True)
+    
     try:
         os.chdir(tools_dir)
         
-        # Run DIGen with stdin redirected to /dev/null
-        # This prevents DIGen from reading commands from stdin
-        with open(os.devnull, 'r') as devnull:
-            process = subprocess.Popen(
+        print("Running DIGen (output will be logged and displayed)...")
+        print(f"Log file: {log_file}")
+        print()
+        
+        # Run DIGen with stdin redirected to /dev/null and output to log file
+        # This prevents DIGen from reading commands from stdin and avoids broken pipe errors
+        with open(os.devnull, 'r') as devnull, open(log_file, 'w', buffering=1) as log:
+            # Use subprocess.run for simpler error handling
+            result = subprocess.run(
                 java_cmd,
                 env=env,
                 stdin=devnull,  # Redirect stdin to /dev/null
-                stdout=subprocess.PIPE,
+                stdout=log,     # Write to log file
                 stderr=subprocess.STDOUT,  # Combine stderr with stdout
-                universal_newlines=True,
-                bufsize=1  # Line buffered
+                cwd=tools_dir,
+                text=True
             )
+            exit_code = result.returncode
             
-            # Stream output in real-time
-            for line in process.stdout:
-                # Filter out harmless "Command 'null' is unknown" errors
-                if "Command 'null' is unknown" not in line:
-                    print(line, end='')
+        # Read and display log file (filtering out null command errors)
+        if os.path.exists(log_file):
+            print("DIGen output:")
+            print("-" * 50)
+            with open(log_file, 'r') as f:
+                for line in f:
+                    # Filter out harmless "Command 'null' is unknown" and "Flooding prevention" errors
+                    if "Command 'null' is unknown" not in line:
+                        if "Flooding prevention" not in line:
+                            print(line, end='')
+                        else:
+                            # Show flooding prevention but note it's usually harmless
+                            print("(Note: Flooding prevention triggered - usually harmless if data is generated)")
+            print("-" * 50)
+        else:
+            print("Warning: Log file not created")
             
-            # Wait for process to complete
-            exit_code = process.wait()
-            
+    except subprocess.TimeoutExpired:
+        print("ERROR: DIGen process timed out")
+        exit_code = 1
+    except Exception as e:
+        print(f"Error running DIGen: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        exit_code = 1
     finally:
         os.chdir(original_dir)
     
