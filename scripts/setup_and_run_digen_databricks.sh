@@ -214,9 +214,15 @@ show_digen_help() {
         CLASSPATH="${CLASSPATH}:${COMMONS_CLI_JAR}"
     fi
     
-    # Try with classpath and -jar (reads main class from manifest)
+    # Extract Main-Class from manifest
+    MAIN_CLASS=$(unzip -p "${DIGEN_DIR}/DIGen.jar" META-INF/MANIFEST.MF 2>/dev/null | grep -i "Main-Class:" | cut -d' ' -f2 | tr -d '\r' | tr -d '\n')
+    if [ -z "${MAIN_CLASS}" ]; then
+        MAIN_CLASS="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
+    fi
+    
+    # Use -cp WITHOUT -jar to include external dependencies
     if [ "${CLASSPATH}" != "${DIGEN_DIR}/DIGen.jar" ]; then
-        java -cp "${CLASSPATH}" -jar "${DIGEN_DIR}/DIGen.jar" -h || \
+        java -cp "${CLASSPATH}" ${MAIN_CLASS} -h || \
         java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
     else
         java -jar "${DIGEN_DIR}/DIGen.jar" -h || true
@@ -250,12 +256,24 @@ run_digen() {
         CLASSPATH="${CLASSPATH}:${COMMONS_CLI_JAR}"
     fi
     
+    # Extract Main-Class from manifest
+    MAIN_CLASS=$(unzip -p "${DIGEN_DIR}/DIGen.jar" META-INF/MANIFEST.MF 2>/dev/null | grep -i "Main-Class:" | cut -d' ' -f2 | tr -d '\r' | tr -d '\n')
+    
+    # If not found, use common wrapper class
+    if [ -z "${MAIN_CLASS}" ]; then
+        MAIN_CLASS="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
+        log_info "Using default main class: ${MAIN_CLASS}"
+    else
+        log_info "Found main class in manifest: ${MAIN_CLASS}"
+    fi
+    
     # Try running with classpath first (for dependencies)
     if [ "${CLASSPATH}" != "${DIGEN_DIR}/DIGen.jar" ]; then
         log_info "Running DIGen with classpath: ${CLASSPATH}"
-        # Use -jar which automatically reads Main-Class from manifest
-        # The classpath will include the dependency JARs
-        java -Xmx4g -cp "${CLASSPATH}" -jar "${DIGEN_DIR}/DIGen.jar" -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}"
+        log_info "Main class: ${MAIN_CLASS}"
+        # CRITICAL: Use -cp WITHOUT -jar to include external dependencies
+        # When using -jar, Java ignores -cp options!
+        java -Xmx4g -cp "${CLASSPATH}" ${MAIN_CLASS} -o "${OUTPUT_DIR}/" -sf "${SCALE_FACTOR}"
     else
         # Fallback to standard jar execution
         log_warn "Running without explicit classpath (may fail if dependencies missing)"

@@ -91,15 +91,46 @@ TPCDI_TOOLS_URL = ""  # Leave empty if tools are already in DBFS
 # MAGIC %sh
 # MAGIC cd /dbfs/tmp/tpc-di-setup/Tools
 # MAGIC 
-# MAGIC # Build classpath with dependencies
+# MAGIC # Extract Main-Class from JAR manifest
+# MAGIC MAIN_CLASS=$(unzip -p DIGen.jar META-INF/MANIFEST.MF 2>/dev/null | grep -i "Main-Class:" | cut -d' ' -f2 | tr -d '\r' | tr -d '\n')
+# MAGIC 
+# MAGIC # If Main-Class not found, try common alternatives
+# MAGIC if [ -z "$MAIN_CLASS" ]; then
+# MAGIC   MAIN_CLASS="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
+# MAGIC fi
+# MAGIC 
+# MAGIC echo "Main class: $MAIN_CLASS"
+# MAGIC 
+# MAGIC # Build classpath with dependencies (must include both JARs)
 # MAGIC CLASSPATH="DIGen.jar:lib/commons-cli-1.4.jar"
 # MAGIC 
 # MAGIC # Show DIGen help
-# MAGIC # Use -jar which reads Main-Class from manifest automatically
-# MAGIC java -cp "$CLASSPATH" -jar DIGen.jar -h
+# MAGIC # Use -cp WITHOUT -jar to include external dependencies
+# MAGIC java -cp "$CLASSPATH" $MAIN_CLASS -h
 # MAGIC 
 # MAGIC # Run DIGen (adjust scale factor as needed)
-# MAGIC # java -Xmx4g -cp "$CLASSPATH" -jar DIGen.jar -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
+# MAGIC # java -Xmx4g -cp "$CLASSPATH" $MAIN_CLASS -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Alternative: If Main-Class extraction fails, use this approach
+
+# COMMAND ----------
+
+# MAGIC %sh
+# MAGIC # Alternative method: Extract and use the actual main class
+# MAGIC cd /dbfs/tmp/tpc-di-setup/Tools
+# MAGIC 
+# MAGIC # Build classpath - include both JARs
+# MAGIC CLASSPATH="DIGen.jar:lib/commons-cli-1.4.jar"
+# MAGIC 
+# MAGIC # Try common main class patterns for DIGen
+# MAGIC # The JAR uses a wrapper loader, so we need to use the loader class
+# MAGIC MAIN_CLASS="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
+# MAGIC 
+# MAGIC # Run with -cp (NOT -jar) to include dependencies
+# MAGIC java -Xmx4g -cp "$CLASSPATH" $MAIN_CLASS -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
 
 # COMMAND ----------
 
