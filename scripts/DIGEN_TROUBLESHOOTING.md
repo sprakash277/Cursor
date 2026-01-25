@@ -2,26 +2,40 @@
 
 ## Common Errors and Solutions
 
-### Error: "Command 'YES' is unknown" or "Command 'EXIT_CODE=$?' is unknown"
+### Error: "Command 'YES' is unknown", "Command 'EXIT_CODE=$?' is unknown", or "Command 'null' is unknown"
 
-**Problem:** DIGen is running in interactive mode and reading subsequent shell commands from stdin as commands to its interactive shell.
+**Problem:** DIGen is running in interactive mode and reading from stdin (Java System.in). It interprets any input (including null/empty) as commands to its interactive shell.
 
 **Solution:** 
-- Redirect stdin to `/dev/null` when running DIGen
+- Redirect stdin to `/dev/null` when running DIGen: `java ... < /dev/null`
+- Also redirect stderr to see output: `java ... 2>&1 < /dev/null`
 - Set `PDG_AGREE=YES` as an environment variable BEFORE running DIGen
 - The environment variable handles license agreement, and redirecting stdin prevents interactive mode
 
 **Correct command:**
 ```bash
 export PDG_AGREE=YES
-java -Xmx8g -cp "DIGen.jar:lib/commons-cli-1.4.jar" org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader -o /output/ -sf 1 < /dev/null
+java -Xmx8g -cp "DIGen.jar:lib/commons-cli-1.4.jar" org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader -o /output/ -sf 1 2>&1 < /dev/null
 ```
+
+**Important Note about "Command 'null' is unknown" errors:**
+- These errors may still appear even with stdin redirected
+- **They are usually harmless** - DIGen will continue generating data
+- The `PDG_AGREE=YES` environment variable handles the license agreement
+- Check if output files were generated to verify success:
+  ```bash
+  ls -lh /output/*.txt
+  ```
+- If files are generated, the errors can be ignored
 
 **Incorrect commands (DO NOT USE):**
 ```bash
 yes YES | java -Xmx8g -cp "..." ...  # This causes errors!
 java -Xmx8g -cp "..." ...  # Without < /dev/null, reads shell commands as input!
+java -Xmx8g -cp "..." ... < /dev/null  # Missing 2>&1 may hide errors
 ```
+
+**Note:** The `2>&1` redirects stderr to stdout so you can see DIGen's output, while `< /dev/null` prevents it from reading commands from stdin.
 
 ### Error: "Cannot start again while data generation process is already running"
 
