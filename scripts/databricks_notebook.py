@@ -16,126 +16,202 @@
 # COMMAND ----------
 
 # Configuration variables
-SCALE_FACTOR = 1  # Scale factor (1 = ~1GB, 10 = ~10GB, etc.)
+SCALE_FACTOR = 10  # Scale factor (1 = ~1GB, 10 = ~10GB, etc.)
 GCS_BUCKET = "your-tpc-di-bucket"  # Your GCS bucket name
 GCS_RAW_PATH = "raw"  # Path in bucket for raw data
 PROJECT_ID = "your-project-id"  # Your GCP project ID
 
-# TPC-DI Tools URL (download from TPC website)
-# Get from: https://www.tpc.org/tpc_documents_current_versions/current_specifications5.asp
-TPCDI_TOOLS_URL = ""  # Leave empty if tools are already in DBFS
+# TPC-DI Tools zip file location in Databricks workspace
+TPCDI_ZIP_PATH = "/Workspace/Users/sumit.prakash@databricks.com/Cursor/datagen/801FA37E-A4C5-4307-BD70-985A205019ED-TPC-DI-Tool.zip"
+
+# Local directories
+WORK_DIR = "/dbfs/tmp/tpc-di-setup"
+TOOLS_DIR = f"{WORK_DIR}/Tools"
+OUTPUT_DIR = f"{WORK_DIR}/output"
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 1: Setup Environment
+# MAGIC ## Step 1: Install Java 8 and Setup Environment
 
 # COMMAND ----------
 
 # MAGIC %sh
-# MAGIC # Set environment variables
-# MAGIC export SCALE_FACTOR=1
-# MAGIC export GCS_BUCKET=your-tpc-di-bucket
-# MAGIC export GCS_RAW_PATH=raw
-# MAGIC export PROJECT_ID=your-project-id
+# MAGIC # Install Java 8
+# MAGIC sudo apt update
+# MAGIC sudo apt install openjdk-8-jdk -y
+# MAGIC 
+# MAGIC # Set Java environment variables
+# MAGIC export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+# MAGIC export PATH=$JAVA_HOME/bin:$PATH
+# MAGIC 
+# MAGIC # Verify Java installation
+# MAGIC java -version
+# MAGIC echo "JAVA_HOME: $JAVA_HOME"
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Step 2: Extract TPC-DI Tools and Setup
+
+# COMMAND ----------
+
+# MAGIC %sh
+# MAGIC # Set Java environment (needed in each cell)
+# MAGIC export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+# MAGIC export PATH=$JAVA_HOME/bin:$PATH
 # MAGIC 
 # MAGIC # Create work directories
 # MAGIC mkdir -p /dbfs/tmp/tpc-di-setup
+# MAGIC mkdir -p /dbfs/tmp/tpc-di-setup/Tools
 # MAGIC mkdir -p /dbfs/tmp/tpc-di-setup/output
 # MAGIC 
-# MAGIC # Check Java
-# MAGIC java -version
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Step 2: Download and Setup DIGen
-
-# COMMAND ----------
-
-# MAGIC %sh
-# MAGIC # Download TPC-DI Tools (if URL provided)
-# MAGIC # Uncomment and update URL:
-# MAGIC # cd /dbfs/tmp/tpc-di-setup
-# MAGIC # curl -L -o TPCDI_Tools.zip "YOUR_TPCDI_TOOLS_URL_HERE"
-# MAGIC # unzip -q -o TPCDI_Tools.zip
-# MAGIC # 
-# MAGIC # Rename PDGF to pdgf (required by DIGen)
-# MAGIC # if [ -d "Tools/PDGF" ]; then
-# MAGIC #   mv Tools/PDGF Tools/pdgf
-# MAGIC # fi
+# MAGIC # Copy zip file from workspace to local filesystem for extraction
+# MAGIC ZIP_FILE="/Workspace/Users/sumit.prakash@databricks.com/Cursor/datagen/801FA37E-A4C5-4307-BD70-985A205019ED-TPC-DI-Tool.zip"
+# MAGIC TEMP_ZIP="/tmp/tpcdi-tools.zip"
 # MAGIC 
-# MAGIC # Or if already uploaded to DBFS:
-# MAGIC # dbutils.fs.cp("dbfs:/tmp/tpc-di-tools/TPCDI_Tools.zip", "file:/tmp/tpc-di-setup/TPCDI_Tools.zip")
-# MAGIC # cd /tmp/tpc-di-setup && unzip -q -o TPCDI_Tools.zip && mv Tools/PDGF Tools/pdgf
+# MAGIC echo "Copying TPC-DI Tools zip file..."
+# MAGIC cp "$ZIP_FILE" "$TEMP_ZIP"
+# MAGIC 
+# MAGIC # Extract to work directory
+# MAGIC echo "Extracting TPC-DI Tools..."
+# MAGIC cd /dbfs/tmp/tpc-di-setup
+# MAGIC unzip -q -o "$TEMP_ZIP"
+# MAGIC 
+# MAGIC # Rename PDGF to pdgf (required by DIGen)
+# MAGIC if [ -d "Tools/PDGF" ]; then
+# MAGIC   echo "Renaming PDGF to pdgf..."
+# MAGIC   mv Tools/PDGF Tools/pdgf
+# MAGIC   echo "✓ PDGF renamed to pdgf"
+# MAGIC else
+# MAGIC   echo "PDGF directory not found (may already be renamed)"
+# MAGIC fi
+# MAGIC 
+# MAGIC # Verify DIGen.jar exists
+# MAGIC if [ -f "Tools/DIGen.jar" ]; then
+# MAGIC   echo "✓ DIGen.jar found"
+# MAGIC   ls -lh Tools/DIGen.jar
+# MAGIC else
+# MAGIC   echo "✗ ERROR: DIGen.jar not found!"
+# MAGIC   exit 1
+# MAGIC fi
+# MAGIC 
+# MAGIC # Clean up temp file
+# MAGIC rm -f "$TEMP_ZIP"
+# MAGIC 
+# MAGIC echo "TPC-DI Tools setup completed!"
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 3: Run DIGen
+# MAGIC ## Step 3: Download Apache Commons CLI Dependency
 
 # COMMAND ----------
 
 # MAGIC %sh
+# MAGIC # Set Java environment
+# MAGIC export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+# MAGIC export PATH=$JAVA_HOME/bin:$PATH
+# MAGIC 
 # MAGIC # Download Apache Commons CLI dependency (required for DIGen)
 # MAGIC mkdir -p /dbfs/tmp/tpc-di-setup/Tools/lib
 # MAGIC cd /dbfs/tmp/tpc-di-setup/Tools/lib
 # MAGIC 
 # MAGIC # Download commons-cli
+# MAGIC echo "Downloading Apache Commons CLI..."
 # MAGIC curl -L -o commons-cli-1.4.jar https://repo1.maven.org/maven2/commons-cli/commons-cli/1.4/commons-cli-1.4.jar
 # MAGIC 
-# MAGIC echo "Apache Commons CLI downloaded"
-
-# COMMAND ----------
-
-# MAGIC %sh
-# MAGIC cd /dbfs/tmp/tpc-di-setup/Tools
-# MAGIC 
-# MAGIC # Extract Main-Class from JAR manifest
-# MAGIC MAIN_CLASS=$(unzip -p DIGen.jar META-INF/MANIFEST.MF 2>/dev/null | grep -i "Main-Class:" | cut -d' ' -f2 | tr -d '\r' | tr -d '\n')
-# MAGIC 
-# MAGIC # If Main-Class not found, try common alternatives
-# MAGIC if [ -z "$MAIN_CLASS" ]; then
-# MAGIC   MAIN_CLASS="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
+# MAGIC if [ -f "commons-cli-1.4.jar" ]; then
+# MAGIC   echo "✓ Apache Commons CLI downloaded successfully"
+# MAGIC   ls -lh commons-cli-1.4.jar
+# MAGIC else
+# MAGIC   echo "✗ ERROR: Failed to download Apache Commons CLI"
+# MAGIC   exit 1
 # MAGIC fi
-# MAGIC 
-# MAGIC echo "Main class: $MAIN_CLASS"
-# MAGIC 
-# MAGIC # Build classpath with dependencies (must include both JARs)
-# MAGIC CLASSPATH="DIGen.jar:lib/commons-cli-1.4.jar"
-# MAGIC 
-# MAGIC # Show DIGen help
-# MAGIC # Use -cp WITHOUT -jar to include external dependencies
-# MAGIC java -cp "$CLASSPATH" $MAIN_CLASS -h
-# MAGIC 
-# MAGIC # Run DIGen (adjust scale factor as needed)
-# MAGIC # java -Xmx4g -cp "$CLASSPATH" $MAIN_CLASS -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Alternative: If Main-Class extraction fails, use this approach
+# MAGIC ## Step 4: Run DIGen
 
 # COMMAND ----------
 
 # MAGIC %sh
-# MAGIC # Alternative method: Extract and use the actual main class
+# MAGIC # Set Java environment
+# MAGIC export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+# MAGIC export PATH=$JAVA_HOME/bin:$PATH
+# MAGIC 
+# MAGIC # Set PDG agreement (required by DIGen)
+# MAGIC export PDG_AGREE=YES
+# MAGIC 
+# MAGIC # Navigate to Tools directory
 # MAGIC cd /dbfs/tmp/tpc-di-setup/Tools
 # MAGIC 
-# MAGIC # Build classpath - include both JARs
-# MAGIC CLASSPATH="DIGen.jar:lib/commons-cli-1.4.jar"
+# MAGIC # Build classpath with dependencies
+# MAGIC CLASSPATH="/dbfs/tmp/tpc-di-setup/Tools/DIGen.jar:/dbfs/tmp/tpc-di-setup/Tools/lib/commons-cli-1.4.jar"
 # MAGIC 
-# MAGIC # Try common main class patterns for DIGen
-# MAGIC # The JAR uses a wrapper loader, so we need to use the loader class
+# MAGIC # Main class (Eclipse JAR wrapper)
 # MAGIC MAIN_CLASS="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
 # MAGIC 
-# MAGIC # Run with -cp (NOT -jar) to include dependencies
-# MAGIC java -Xmx4g -cp "$CLASSPATH" $MAIN_CLASS -o /dbfs/tmp/tpc-di-setup/output/ -sf 1
+# MAGIC # Scale factor
+# MAGIC SCALE_FACTOR=10
+# MAGIC 
+# MAGIC # Output directory
+# MAGIC OUTPUT_DIR="/dbfs/tmp/tpc-di-setup/output"
+# MAGIC mkdir -p "$OUTPUT_DIR"
+# MAGIC 
+# MAGIC echo "=========================================="
+# MAGIC echo "Running TPC-DI DIGen"
+# MAGIC echo "=========================================="
+# MAGIC echo "Scale Factor: $SCALE_FACTOR"
+# MAGIC echo "Output Directory: $OUTPUT_DIR"
+# MAGIC echo "Classpath: $CLASSPATH"
+# MAGIC echo "Main Class: $MAIN_CLASS"
+# MAGIC echo "=========================================="
+# MAGIC echo ""
+# MAGIC echo "Starting data generation (this may take a while)..."
+# MAGIC 
+# MAGIC # Run DIGen
+# MAGIC # Use yes YES| to automatically agree to license
+# MAGIC # Use -cp WITHOUT -jar to include external dependencies
+# MAGIC yes YES | java -Xmx8g -cp "$CLASSPATH" $MAIN_CLASS -o "$OUTPUT_DIR/" -sf $SCALE_FACTOR
+# MAGIC 
+# MAGIC if [ $? -eq 0 ]; then
+# MAGIC   echo ""
+# MAGIC   echo "=========================================="
+# MAGIC   echo "✓ Data generation completed successfully!"
+# MAGIC   echo "=========================================="
+# MAGIC else
+# MAGIC   echo ""
+# MAGIC   echo "=========================================="
+# MAGIC   echo "✗ ERROR: Data generation failed!"
+# MAGIC   echo "=========================================="
+# MAGIC   exit 1
+# MAGIC fi
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4: Upload Generated Files to GCS
+# MAGIC ## Step 5: List Generated Files
+
+# COMMAND ----------
+
+# MAGIC %sh
+# MAGIC OUTPUT_DIR="/dbfs/tmp/tpc-di-setup/output"
+# MAGIC 
+# MAGIC echo "Generated files:"
+# MAGIC echo "=========================================="
+# MAGIC ls -lh "$OUTPUT_DIR"/*.txt 2>/dev/null | awk '{print $9, "(" $5 ")"}'
+# MAGIC 
+# MAGIC # Count files
+# MAGIC FILE_COUNT=$(ls -1 "$OUTPUT_DIR"/*.txt 2>/dev/null | wc -l)
+# MAGIC echo ""
+# MAGIC echo "Total files generated: $FILE_COUNT"
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Step 6: Upload Generated Files to GCS
 
 # COMMAND ----------
 
@@ -178,7 +254,7 @@ print(f"\nAll files uploaded to gs://{gcs_bucket}/{gcs_path}/")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5: Verify Upload
+# MAGIC ## Step 7: Verify Upload
 
 # COMMAND ----------
 
