@@ -1,0 +1,16 @@
+[Unit]
+Description=Contest Scoring System Flask Application
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=%h/scoring_app
+Environment="PATH=%h/scoring_app/venv/bin"
+EnvironmentFile=%h/scoring_app/.env
+ExecStart=%h/scoring_app/venv/bin/gunicorn -w 4 -b 0.0.0.0:5000 --timeout 120 --access-logfile %h/scoring_app/logs/access.log --error-logfile %h/scoring_app/logs/error.log app:app
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

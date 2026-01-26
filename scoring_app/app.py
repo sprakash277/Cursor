@@ -20,16 +20,18 @@ def normalize_contest_filter(contest_name):
     return normalize_contest_name(contest_name) if contest_name else contest_name
 
 # Configuration
-UPLOAD_FOLDER = 'uploads'
-EXCEL_FILE_PATH = '/Users/sumit.prakash/Downloads/sanskriti-3.xlsx'
-SCORES_FILE = 'scores.json'
-JUDGES_FILE = 'judges.json'
-WALKIN_PARTICIPANTS_FILE = 'walkin_participants.json'
-PARTICIPANTS_MANAGEMENT_FILE = 'participants_management.json'
-SPEECH_TOPICS_FILE = 'speech_topics.json'
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'uploads')
+DATA_FOLDER = os.environ.get('DATA_FOLDER', 'data')
+EXCEL_FILE_PATH = os.environ.get('EXCEL_FILE_PATH', os.path.join(DATA_FOLDER, 'sanskriti-3.xlsx'))
+SCORES_FILE = os.path.join(DATA_FOLDER, 'scores.json')
+JUDGES_FILE = os.path.join(DATA_FOLDER, 'judges.json')
+WALKIN_PARTICIPANTS_FILE = os.path.join(DATA_FOLDER, 'walkin_participants.json')
+PARTICIPANTS_MANAGEMENT_FILE = os.path.join(DATA_FOLDER, 'participants_management.json')
+SPEECH_TOPICS_FILE = os.path.join(DATA_FOLDER, 'speech_topics.json')
 
-# Ensure uploads directory exists
+# Ensure uploads and data directories exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(DATA_FOLDER, exist_ok=True)
 
 # Standardized contest names
 STANDARD_CONTESTS = [
@@ -1991,4 +1993,8 @@ def delete_participant_from_contest():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Production settings
+    debug_mode = os.environ.get('FLASK_ENV', 'development') == 'development'
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=debug_mode, host=host, port=port)

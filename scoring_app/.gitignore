@@ -30,3 +30,15 @@ uploads/
 # OS
 .DS_Store
 Thumbs.db
+
+# Environment variables
+.env
+
+# Data files
+data/*.json
+data/*.xlsx
+uploads/*
+
+# Logs
+logs/
+*.log
