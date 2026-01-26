@@ -32,7 +32,13 @@
             </div>
         </div>
 
+        {% if judge_existing_score %}
+        {% set update_count = judge_existing_score.get('update_count', 0) %}
+        {% set can_overwrite = update_count < 1 %}
+        <form id="scoreForm" class="score-form {% if not can_overwrite %}score-form-locked{% endif %}">
+        {% else %}
         <form id="scoreForm" class="score-form">
+        {% endif %}
             <input type="hidden" id="contestantId" value="{{ contestant.id }}">
             <input type="hidden" id="judgeName" value="{{ judge_name }}">
 
@@ -44,11 +50,20 @@
             </div>
 
             {% if judge_existing_score %}
-            <div class="existing-score-alert">
+            {% set update_count = judge_existing_score.get('update_count', 0) %}
+            {% set can_overwrite = update_count < 1 %}
+            <div class="existing-score-alert {% if not can_overwrite %}existing-score-alert-locked{% endif %}">
+                {% if can_overwrite %}
                 <p><strong>⚠️ You have already scored this contestant for this contest</strong></p>
                 <p>Your previous score: <strong>{{ judge_existing_score.score }}</strong></p>
-                <p>Submitted: {{ judge_existing_score.timestamp[:19] if judge_existing_score.timestamp else 'N/A' }}</p>
-                <p>Submitting again will update your previous score.</p>
+                <p>Submitted: {{ judge_existing_score.get('original_timestamp', judge_existing_score.timestamp)[:19] if judge_existing_score.get('original_timestamp') or judge_existing_score.timestamp else 'N/A' }}</p>
+                <p><strong>You can update your score once. Submitting again will overwrite your previous score.</strong></p>
+                {% else %}
+                <p><strong>🔒 You have already submitted and updated your score</strong></p>
+                <p>Your score: <strong>{{ judge_existing_score.score }}</strong></p>
+                <p>Last updated: {{ judge_existing_score.timestamp[:19] if judge_existing_score.timestamp else 'N/A' }}</p>
+                <p><strong>No further changes are allowed. You have used your one-time update.</strong></p>
+                {% endif %}
             </div>
             {% endif %}
 
@@ -128,17 +143,30 @@
             </div>
             {% endif %}
 
+            {% if judge_existing_score %}
+            {% set update_count = judge_existing_score.get('update_count', 0) %}
+            {% set can_overwrite = update_count < 1 %}
+            {% else %}
+            {% set update_count = 0 %}
+            {% set can_overwrite = True %}
+            {% endif %}
+            
             {% if contestant.contest_type == 'Instrument Playing Contest' %}
             <!-- Detailed scoring for Instrument contest -->
-            <div class="instrument-scoring-section">
+            <div class="instrument-scoring-section {% if judge_existing_score and not can_overwrite %}score-form-locked{% endif %}">
                 <h3>Scoring Criteria</h3>
                 
                 {% set detailed_scores = judge_existing_score.get('detailed_scores', {}) if judge_existing_score else {} %}
+                {% if judge_existing_score %}
+                {% set update_count = judge_existing_score.get('update_count', 0) %}
+                {% set can_overwrite = update_count < 1 %}
+                {% endif %}
                 <div class="form-group">
                     <label for="musical_instrument">Musical Instrument *</label>
                     <input type="text" id="musical_instrument" name="musical_instrument" required 
                            placeholder="Enter the instrument being used (e.g., Piano, Violin, Flute, etc.)"
-                           value="{{ detailed_scores.get('musical_instrument', '') }}">
+                           value="{{ detailed_scores.get('musical_instrument', '') }}"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Enter the name of the musical instrument</small>
                 </div>
                 
@@ -148,7 +176,8 @@
                            min="1" max="10" step="1" 
                            placeholder="Enter score (1-10)"
                            value="{{ detailed_scores.get('poise_presentation', '') }}"
-                           oninput="calculateInstrumentTotal()">
+                           oninput="calculateInstrumentTotal()"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Score from 1 (Low) to 10 (High)</small>
                 </div>
 
@@ -158,7 +187,8 @@
                            min="1" max="10" step="1" 
                            placeholder="Enter score (1-10)"
                            value="{{ detailed_scores.get('technical_skill', '') }}"
-                           oninput="calculateInstrumentTotal()">
+                           oninput="calculateInstrumentTotal()"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Score from 1 (Low) to 10 (High)</small>
                 </div>
 
@@ -168,7 +198,8 @@
                            min="1" max="10" step="1" 
                            placeholder="Enter score (1-10)"
                            value="{{ detailed_scores.get('musicality', '') }}"
-                           oninput="calculateInstrumentTotal()">
+                           oninput="calculateInstrumentTotal()"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Score from 1 (Low) to 10 (High)</small>
                 </div>
 
@@ -178,7 +209,8 @@
                            min="1" max="10" step="1" 
                            placeholder="Enter score (1-10)"
                            value="{{ detailed_scores.get('impact', '') }}"
-                           oninput="calculateInstrumentTotal()">
+                           oninput="calculateInstrumentTotal()"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Score from 1 (Low) to 10 (High)</small>
                 </div>
 
@@ -189,21 +221,27 @@
                            placeholder="Auto-calculated"
                            readonly
                            class="form-control-disabled"
-                           value="{{ judge_existing_score.score if judge_existing_score else '' }}">
+                           value="{{ judge_existing_score.score if judge_existing_score else '' }}"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Automatically calculated from the above scores</small>
                 </div>
             </div>
             {% elif contestant.contest_type == 'Fancy Dress Contest' or contestant.contest_type == 'Fancy Dress' %}
             <!-- Fancy Dress contest with "Dressed up as" field -->
-            <div class="instrument-scoring-section">
+            <div class="instrument-scoring-section {% if judge_existing_score and not can_overwrite %}score-form-locked{% endif %}">
                 <h3>Fancy Dress Details</h3>
                 
                 {% set detailed_scores = judge_existing_score.get('detailed_scores', {}) if judge_existing_score else {} %}
+                {% if judge_existing_score %}
+                {% set update_count = judge_existing_score.get('update_count', 0) %}
+                {% set can_overwrite = update_count < 1 %}
+                {% endif %}
                 <div class="form-group">
                     <label for="dressed_up_as">Dressed up as *</label>
                     <input type="text" id="dressed_up_as" name="dressed_up_as" required 
                            placeholder="Enter what the participant was dressed up as (e.g., Doctor, Superhero, Animal, etc.)"
-                           value="{{ detailed_scores.get('dressed_up_as', '') }}">
+                           value="{{ detailed_scores.get('dressed_up_as', '') }}"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Enter what the participant was dressed up as</small>
                 </div>
                 
@@ -212,23 +250,29 @@
                     <input type="number" id="score" name="score" required 
                            min="0" max="100" step="0.1" 
                            placeholder="Enter score (0-100)"
-                           value="{{ judge_existing_score.score if judge_existing_score else '' }}">
+                           value="{{ judge_existing_score.score if judge_existing_score else '' }}"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Enter a score between 0 and 100</small>
                 </div>
             </div>
             {% elif is_singing_contest %}
             <!-- Detailed scoring for Singing contest -->
-            <div class="instrument-scoring-section">
+            <div class="instrument-scoring-section {% if judge_existing_score and not can_overwrite %}score-form-locked{% endif %}">
                 <h3>Scoring Criteria</h3>
                 
                 {% set detailed_scores = judge_existing_score.get('detailed_scores', {}) if judge_existing_score else {} %}
+                {% if judge_existing_score %}
+                {% set update_count = judge_existing_score.get('update_count', 0) %}
+                {% set can_overwrite = update_count < 1 %}
+                {% endif %}
                 <div class="form-group">
                     <label for="voice_tone">Voice & Tone (1 - Low to 10 - High) *</label>
                     <input type="number" id="voice_tone" name="voice_tone" required 
                            min="1" max="10" step="1" 
                            placeholder="Enter score (1-10)"
                            value="{{ detailed_scores.get('voice_tone', '') }}"
-                           oninput="calculateSingingTotal()">
+                           oninput="calculateSingingTotal()"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Score from 1 (Low) to 10 (High)</small>
                 </div>
 
@@ -238,7 +282,8 @@
                            min="1" max="10" step="1" 
                            placeholder="Enter score (1-10)"
                            value="{{ detailed_scores.get('timing_beat', '') }}"
-                           oninput="calculateSingingTotal()">
+                           oninput="calculateSingingTotal()"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Score from 1 (Low) to 10 (High)</small>
                 </div>
 
@@ -248,7 +293,8 @@
                            min="1" max="10" step="1" 
                            placeholder="Enter score (1-10)"
                            value="{{ detailed_scores.get('pronunciation_lyrics', '') }}"
-                           oninput="calculateSingingTotal()">
+                           oninput="calculateSingingTotal()"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Score from 1 (Low) to 10 (High)</small>
                 </div>
 
@@ -258,7 +304,8 @@
                            min="1" max="10" step="1" 
                            placeholder="Enter score (1-10)"
                            value="{{ detailed_scores.get('impact', '') }}"
-                           oninput="calculateSingingTotal()">
+                           oninput="calculateSingingTotal()"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Score from 1 (Low) to 10 (High)</small>
                 </div>
 
@@ -269,7 +316,8 @@
                            placeholder="Auto-calculated"
                            readonly
                            class="form-control-disabled"
-                           value="{{ judge_existing_score.score if judge_existing_score else '' }}">
+                           value="{{ judge_existing_score.score if judge_existing_score else '' }}"
+                           {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                     <small class="form-help">Automatically calculated from the above scores</small>
                 </div>
             </div>
@@ -280,7 +328,8 @@
                 <input type="number" id="score" name="score" required 
                        min="0" max="100" step="0.1" 
                        placeholder="Enter score (0-100)"
-                       value="{{ judge_existing_score.score if judge_existing_score else '' }}">
+                       value="{{ judge_existing_score.score if judge_existing_score else '' }}"
+                       {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>
                 <small class="form-help">Enter a score between 0 and 100</small>
             </div>
             {% endif %}
@@ -288,13 +337,28 @@
             <div class="form-group">
                 <label for="comments">{% if contestant.contest_type == 'Instrument Playing Contest' or is_singing_contest %}Remarks{% else %}Comments{% endif %} (Optional)</label>
                 <textarea id="comments" name="comments" rows="4" 
-                          placeholder="Enter any {% if contestant.contest_type == 'Instrument Playing Contest' or is_singing_contest %}remarks{% else %}comments or feedback{% endif %}...">{{ judge_existing_score.comments if judge_existing_score and judge_existing_score.comments else '' }}</textarea>
+                          placeholder="Enter any {% if contestant.contest_type == 'Instrument Playing Contest' or is_singing_contest %}remarks{% else %}comments or feedback{% endif %}..."
+                          {% if judge_existing_score and not can_overwrite %}disabled{% endif %}>{{ judge_existing_score.comments if judge_existing_score and judge_existing_score.comments else '' }}</textarea>
             </div>
 
             <div class="form-actions">
+                {% if judge_existing_score %}
+                {% set update_count = judge_existing_score.get('update_count', 0) %}
+                {% set can_overwrite = update_count < 1 %}
+                {% if can_overwrite %}
+                <button type="submit" class="btn btn-primary btn-large">
+                    Update Score (One-time allowed)
+                </button>
+                {% else %}
+                <button type="button" class="btn btn-secondary btn-large" disabled style="opacity: 0.6; cursor: not-allowed;">
+                    Score Locked (Update Used)
+                </button>
+                {% endif %}
+                {% else %}
                 <button type="submit" class="btn btn-primary btn-large">
                     Submit Score
                 </button>
+                {% endif %}
                 <button type="button" class="btn btn-secondary" onclick="window.history.back()">
                     Cancel
                 </button>
@@ -434,6 +498,19 @@ document.addEventListener('DOMContentLoaded', function() {
 document.getElementById('scoreForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
+    // Check if score can be overwritten
+    {% if judge_existing_score %}
+    {% set update_count = judge_existing_score.get('update_count', 0) %}
+    {% set can_overwrite = update_count < 1 %}
+    const canOverwrite = {{ 'true' if can_overwrite else 'false' }};
+    if (!canOverwrite) {
+        alert('You have already used your one-time update. No further changes are allowed.');
+        return;
+    }
+    {% else %}
+    const canOverwrite = true;
+    {% endif %}
+    
     const isInstrument = {{ 'true' if contestant.contest_type == 'Instrument Playing Contest' else 'false' }};
     const isSinging = {{ 'true' if is_singing_contest else 'false' }};
     const isFancyDress = {{ 'true' if contestant.contest_type == 'Fancy Dress Contest' or contestant.contest_type == 'Fancy Dress' else 'false' }};
@@ -556,11 +633,29 @@ document.getElementById('scoreForm').addEventListener('submit', async function(e
         const data = await response.json();
 
         if (data.success) {
+            {% if judge_existing_score %}
+            {% set update_count = judge_existing_score.get('update_count', 0) %}
+            {% if update_count < 1 %}
+            alert('Score updated successfully! You have used your one-time update.');
+            {% else %}
             alert('Score submitted successfully!');
+            {% endif %}
+            {% else %}
+            alert('Score submitted successfully!');
+            {% endif %}
             window.location.href = '/';
         } else {
-            alert('Error: ' + (data.error || 'Failed to submit score'));
+            if (response.status === 403) {
+                alert('Error: ' + (data.error || 'You have already used your one-time update. No further changes are allowed.'));
+                // Reload page to show locked state
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                alert('Error: ' + (data.error || 'Failed to submit score'));
+            }
             submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Score';
             submitBtn.textContent = 'Submit Score';
         }
     } catch (error) {

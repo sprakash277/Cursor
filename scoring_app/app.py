@@ -1416,13 +1416,29 @@ def submit_score():
     if contestant_key not in scores:
         scores[contestant_key] = {}
     
+    # Check if judge has already scored this contestant
+    existing_score = scores[contestant_key].get(judge_username)
+    update_count = 0
+    
+    if existing_score:
+        # Get the current update count (how many times they've overwritten)
+        update_count = existing_score.get('update_count', 0)
+        
+        # Allow only one overwrite (update_count can be 0 or 1, max is 1)
+        if update_count >= 1:
+            return jsonify({
+                'success': False, 
+                'error': 'You have already submitted and updated your score once. No further changes are allowed.'
+            }), 403
+    
     # Store score with timestamp - use username as key to prevent duplicates
     score_entry = {
         'judge_name': judge_name,
         'judge_username': judge_username,
         'score': score,
         'comments': comments,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+        'update_count': update_count  # Track if this is an update (0 = first submission, 1 = first overwrite)
     }
     
     # Add detailed scores for Instrument contest
@@ -1430,7 +1446,15 @@ def submit_score():
     if detailed_scores:
         score_entry['detailed_scores'] = detailed_scores
     
-    # If judge already scored, update their score (use username as key)
+    # If judge already scored, increment update_count
+    if existing_score:
+        score_entry['update_count'] = update_count + 1
+        score_entry['original_timestamp'] = existing_score.get('original_timestamp', existing_score.get('timestamp'))
+    else:
+        score_entry['update_count'] = 0  # First submission
+        score_entry['original_timestamp'] = score_entry['timestamp']
+    
+    # Store/update the score
     scores[contestant_key][judge_username] = score_entry
     
     save_scores(scores)
