@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Manage Users</h2>
+    <p class="subtitle">Create and manage user accounts, assign contests, and set roles</p>
+</div>
+
+<div class="admin-users-container">
+    <!-- Add User Button -->
+    <div class="users-header">
+        <button class="btn btn-primary" onclick="showAddUserModal()">
+            + Create New User
+        </button>
+    </div>
+
+    <!-- Users Table -->
+    <div class="table-container">
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Assigned Contests</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr data-username="{{ user.username }}">
+                    <td><strong>{{ user.username }}</strong></td>
+                    <td>{{ user.name }}</td>
+                    <td>
+                        <span class="role-badge role-{{ user.role }}">
+                            {{ user.role|title }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if user.role == 'admin' %}
+                        <span class="text-muted">All contests</span>
+                        {% else %}
+                        <div class="contests-list">
+                            {% if user.assigned_contests %}
+                                {% for contest in user.assigned_contests %}
+                                <span class="contest-badge-small">{{ contest }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted">No contests assigned</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-small btn-primary" onclick="editUser('{{ user.username }}')">
+                            Edit
+                        </button>
+                        {% if user.username != session.get('judge_username') %}
+                        <button class="btn btn-small btn-danger" onclick="deleteUser('{{ user.username }}', '{{ user.name }}')">
+                            Delete
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div id="addUserModal" class="modal">
+    <div class="modal-content modal-large">
+        <span class="close" onclick="closeAddUserModal()">&times;</span>
+        <h3>Create New User</h3>
+        <form id="addUserForm" onsubmit="createUser(event)">
+            <div class="form-group">
+                <label for="add-username">Username *</label>
+                <input type="text" id="add-username" name="username" required 
+                       placeholder="Enter username" autocomplete="off">
+                <small class="form-help">Unique identifier for login</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="add-password">Password *</label>
+                <input type="password" id="add-password" name="password" required 
+                       placeholder="Enter password" autocomplete="new-password">
+                <small class="form-help">Password for login</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="add-name">Full Name *</label>
+                <input type="text" id="add-name" name="name" required 
+                       placeholder="Enter full name">
+            </div>
+            
+            <div class="form-group">
+                <label for="add-role">Role *</label>
+                <select id="add-role" name="role" required onchange="updateContestAssignment()">
+                    <option value="">Select role...</option>
+                    <option value="admin">Admin - Full access to all features</option>
+                    <option value="judge">Judge - Can score assigned contests</option>
+                    <option value="checkin">Check-in User - Limited access</option>
+                </select>
+                <small class="form-help">Admin: Full access | Judge: Scoring only | Check-in: Limited access</small>
+            </div>
+            
+            <div class="form-group" id="add-contests-group" style="display: none;">
+                <label for="add-contests">Assigned Contests</label>
+                <div class="contests-selector">
+                    {% for contest in contest_types %}
+                    <label class="contest-checkbox-label">
+                        <input type="checkbox" class="contest-checkbox" value="{{ contest }}">
+                        <span>{{ contest }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <small class="form-help">Select contests this user can access (not applicable for admins)</small>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Create User</button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddUserModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="editUserModal" class="modal">
+    <div class="modal-content modal-large">
+        <span class="close" onclick="closeEditUserModal()">&times;</span>
+        <h3>Edit User</h3>
+        <form id="editUserForm" onsubmit="updateUser(event)">
+            <input type="hidden" id="edit-username" name="username">
+            
+            <div class="form-group">
+                <label for="edit-name">Full Name *</label>
+                <input type="text" id="edit-name" name="name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-role">Role *</label>
+                <select id="edit-role" name="role" required onchange="updateEditContestAssignment()">
+                    <option value="admin">Admin - Full access to all features</option>
+                    <option value="judge">Judge - Can score assigned contests</option>
+                    <option value="checkin">Check-in User - Limited access</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="edit-contests-group">
+                <label for="edit-contests">Assigned Contests</label>
+                <div class="contests-selector">
+                    {% for contest in contest_types %}
+                    <label class="contest-checkbox-label">
+                        <input type="checkbox" class="contest-checkbox-edit" value="{{ contest }}">
+                        <span>{{ contest }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <small class="form-help">Select contests this user can access (not applicable for admins)</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-password">New Password (Optional)</label>
+                <input type="password" id="edit-password" name="password" 
+                       placeholder="Leave blank to keep current password"
+                       autocomplete="new-password">
+                <small class="form-help">Only fill if you want to change the password</small>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAddUserModal() {
+    document.getElementById('addUserModal').style.display = 'block';
+    document.getElementById('add-username').value = '';
+    document.getElementById('add-password').value = '';
+    document.getElementById('add-name').value = '';
+    document.getElementById('add-role').value = '';
+    document.querySelectorAll('.contest-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('add-contests-group').style.display = 'none';
+}
+
+function closeAddUserModal() {
+    document.getElementById('addUserModal').style.display = 'none';
+}
+
+function updateContestAssignment() {
+    const role = document.getElementById('add-role').value;
+    const contestsGroup = document.getElementById('add-contests-group');
+    if (role === 'admin') {
+        contestsGroup.style.display = 'none';
+    } else {
+        contestsGroup.style.display = 'block';
+    }
+}
+
+function editUser(username) {
+    // Fetch user data
+    fetch(`/api/get_user?username=${username}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const user = data.user;
+                document.getElementById('edit-username').value = user.username;
+                document.getElementById('edit-name').value = user.name;
+                document.getElementById('edit-role').value = user.role;
+                document.getElementById('edit-password').value = '';
+                
+                // Set assigned contests
+                document.querySelectorAll('.contest-checkbox-edit').forEach(cb => {
+                    cb.checked = user.assigned_contests.includes(cb.value);
+                });
+                
+                // Show/hide contests based on role
+                updateEditContestAssignment();
+                
+                document.getElementById('editUserModal').style.display = 'block';
+            } else {
+                alert('Error loading user: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Error loading user: ' + error.message);
+        });
+}
+
+function closeEditUserModal() {
+    document.getElementById('editUserModal').style.display = 'none';
+}
+
+function updateEditContestAssignment() {
+    const role = document.getElementById('edit-role').value;
+    const contestsGroup = document.getElementById('edit-contests-group');
+    if (role === 'admin') {
+        contestsGroup.style.display = 'none';
+    } else {
+        contestsGroup.style.display = 'block';
+    }
+}
+
+async function createUser(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('add-username').value.trim();
+    const password = document.getElementById('add-password').value;
+    const name = document.getElementById('add-name').value.trim();
+    const role = document.getElementById('add-role').value;
+    
+    if (!username || !password || !name || !role) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    // Get selected contests
+    const selectedContests = [];
+    if (role !== 'admin') {
+        document.querySelectorAll('.contest-checkbox:checked').forEach(cb => {
+            selectedContests.push(cb.value);
+        });
+    }
+    
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+    
+    try {
+        const response = await fetch('/api/create_user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: username,
+                password: password,
+                name: name,
+                role: role,
+                assigned_contests: selectedContests
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('User created successfully! Page will refresh.');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to create user'));
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    } catch (error) {
+        alert('Error creating user: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+}
+
+async function updateUser(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('edit-username').value;
+    const name = document.getElementById('edit-name').value.trim();
+    const role = document.getElementById('edit-role').value;
+    const password = document.getElementById('edit-password').value;
+    
+    if (!name || !role) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    // Get selected contests
+    const selectedContests = [];
+    if (role !== 'admin') {
+        document.querySelectorAll('.contest-checkbox-edit:checked').forEach(cb => {
+            selectedContests.push(cb.value);
+        });
+    }
+    
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+    
+    try {
+        const formData = {
+            username: username,
+            name: name,
+            role: role,
+            assigned_contests: selectedContests
+        };
+        
+        if (password) {
+            formData.password = password;
+        }
+        
+        const response = await fetch('/api/update_user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('User updated successfully! Page will refresh.');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to update user'));
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    } catch (error) {
+        alert('Error updating user: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+}
+
+async function deleteUser(username, name) {
+    if (!confirm(`Are you sure you want to delete user "${name}" (${username})?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/delete_user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: username
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('User deleted successfully! Page will refresh.');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to delete user'));
+        }
+    } catch (error) {
+        alert('Error deleting user: ' + error.message);
+    }
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const addModal = document.getElementById('addUserModal');
+    const editModal = document.getElementById('editUserModal');
+    if (event.target == addModal) {
+        closeAddUserModal();
+    }
+    if (event.target == editModal) {
+        closeEditUserModal();
+    }
+}
+</script>
+
+<style>
+.users-header {
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.users-table th,
+.users-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.users-table th {
+    background: var(--bg-color);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.role-badge {
+    display: inline-block;
+    padding: 0.3rem 0.8rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.role-admin {
+    background: var(--danger-color);
+    color: white;
+}
+
+.role-judge {
+    background: var(--primary-color);
+    color: white;
+}
+
+.role-checkin {
+    background: var(--info-color);
+    color: white;
+}
+
+.contest-badge-small {
+    display: inline-block;
+    background: var(--primary-color);
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    margin: 0.2rem;
+}
+
+.contests-selector {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 0.5rem;
+}
+
+.contest-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.contest-checkbox-label:hover {
+    background-color: var(--bg-color);
+}
+
+.contest-checkbox-label input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.text-muted {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+</style>
+{% endblock %}

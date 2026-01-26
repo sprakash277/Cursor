@@ -1,0 +1,573 @@
+{% extends "base.html" %}
+
+{% block title %}Score {{ contestant.name }} - Contest Scoring System{% endblock %}
+
+{% block content %}
+<div class="score-page">
+    <div class="back-link">
+        <a href="{{ url_for('index') }}">← Back to Contestants</a>
+    </div>
+
+    <div class="score-form-container">
+        <div class="contestant-header">
+            {% if session.get('is_admin') %}
+            <h2>{{ contestant.name }}</h2>
+            {% else %}
+            <h2>Participant {{ contestant.participant_id if contestant.participant_id else contestant.id }}</h2>
+            {% endif %}
+            <div class="contestant-header-info">
+                <p class="contest-type-badge">{{ contestant.contest_type }}</p>
+                {% if contestant.participant_id %}
+                <p class="participant-id-badge">ID: {{ contestant.participant_id }}</p>
+                {% endif %}
+                {% if contestant.age_group %}
+                <p class="age-group-badge">{{ contestant.age_group }}</p>
+                {% endif %}
+                {% if is_prepared_speech and speech_topic %}
+                <div class="speech-topic-display">
+                    <p class="speech-topic-label">Speech Topic:</p>
+                    <p class="speech-topic-value" lang="hi" dir="auto" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Devanagari', 'Gujarati', 'Telugu', sans-serif; unicode-bidi: plaintext;">{{ speech_topic }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <form id="scoreForm" class="score-form">
+            <input type="hidden" id="contestantId" value="{{ contestant.id }}">
+            <input type="hidden" id="judgeName" value="{{ judge_name }}">
+
+            <div class="form-group">
+                <label>Judge Name</label>
+                <input type="text" value="{{ judge_name }}" disabled 
+                       class="form-control-disabled">
+                <small class="form-help">Logged in as {{ judge_name }}</small>
+            </div>
+
+            {% if judge_existing_score %}
+            <div class="existing-score-alert">
+                <p><strong>⚠️ You have already scored this contestant for this contest</strong></p>
+                <p>Your previous score: <strong>{{ judge_existing_score.score }}</strong></p>
+                <p>Submitted: {{ judge_existing_score.timestamp[:19] if judge_existing_score.timestamp else 'N/A' }}</p>
+                <p>Submitting again will update your previous score.</p>
+            </div>
+            {% endif %}
+
+            {% if judge_all_scores %}
+            <div class="judge-all-scores-section">
+                {% if session.get('is_admin') %}
+                <h3>Your Scores for {{ participant_name }}</h3>
+                {% else %}
+                <h3>Your Scores for Participant {{ contestant.participant_id if contestant.participant_id else contestant.id }}</h3>
+                {% endif %}
+                <p class="section-subtitle">All scores you've given to this participant across all contests</p>
+                <div class="judge-scores-list">
+                    {% for score_entry in judge_all_scores %}
+                    <div class="judge-score-item {% if score_entry.contestant_id == contestant.id %}current-contest{% endif %}">
+                        <div class="judge-score-header">
+                            <div>
+                                <strong>{{ score_entry.contest_type }}</strong>
+                                {% if score_entry.contestant_id == contestant.id %}
+                                <span class="current-badge">Current Contest</span>
+                                {% endif %}
+                                {% if not is_admin_user %}
+                                <br><small style="color: var(--text-secondary);">Participant ID: {{ contestant.participant_id if contestant.participant_id else contestant.id }}</small>
+                                {% endif %}
+                            </div>
+                            <span class="judge-score-value">{{ score_entry.score }}{% if score_entry.contest_type == 'Instrument Playing Contest' or 'singing' in score_entry.contest_type.lower() %} / 40{% endif %}</span>
+                        </div>
+                        {% if score_entry.contest_type == 'Instrument Playing Contest' and score_entry.get('detailed_scores') %}
+                        {% set ds = score_entry.get('detailed_scores', {}) %}
+                        <div class="detailed-scores-breakdown" style="margin: 0.75rem 0; padding: 0.75rem; background: rgba(99, 102, 241, 0.05); border-radius: 6px; font-size: 0.9rem;">
+                            {% if ds.get('musical_instrument') %}
+                            <div style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(99, 102, 241, 0.2);">
+                                <strong>Musical Instrument:</strong> {{ ds.get('musical_instrument') }}
+                            </div>
+                            {% endif %}
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                <div><strong>Poise:</strong> {{ ds.get('poise_presentation', 0) }}/10</div>
+                                <div><strong>Technical:</strong> {{ ds.get('technical_skill', 0) }}/10</div>
+                                <div><strong>Musicality:</strong> {{ ds.get('musicality', 0) }}/10</div>
+                                <div><strong>Impact:</strong> {{ ds.get('impact', 0) }}/10</div>
+                            </div>
+                        </div>
+                        {% elif (score_entry.contest_type == 'Fancy Dress Contest' or score_entry.contest_type == 'Fancy Dress') and score_entry.get('detailed_scores') %}
+                        {% set ds = score_entry.get('detailed_scores', {}) %}
+                        <div class="detailed-scores-breakdown" style="margin: 0.75rem 0; padding: 0.75rem; background: rgba(99, 102, 241, 0.05); border-radius: 6px; font-size: 0.9rem;">
+                            {% if ds.get('dressed_up_as') %}
+                            <div style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(99, 102, 241, 0.2);">
+                                <strong>Dressed up as:</strong> {{ ds.get('dressed_up_as') }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% elif 'singing' in score_entry.contest_type.lower() and score_entry.get('detailed_scores') %}
+                        {% set ds = score_entry.get('detailed_scores', {}) %}
+                        <div class="detailed-scores-breakdown" style="margin: 0.75rem 0; padding: 0.75rem; background: rgba(99, 102, 241, 0.05); border-radius: 6px; font-size: 0.9rem;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                <div><strong>Voice & Tone:</strong> {{ ds.get('voice_tone', 0) }}/10</div>
+                                <div><strong>Timing & Beat:</strong> {{ ds.get('timing_beat', 0) }}/10</div>
+                                <div><strong>Pronunciation & Lyrics:</strong> {{ ds.get('pronunciation_lyrics', 0) }}/10</div>
+                                <div><strong>Impact:</strong> {{ ds.get('impact', 0) }}/10</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <p class="judge-score-meta">
+                            Submitted: {{ score_entry.timestamp[:19] if score_entry.timestamp else 'N/A' }}
+                        </p>
+                        {% if score_entry.comments %}
+                        <p class="judge-score-comments"><strong>{% if score_entry.contest_type == 'Instrument Playing Contest' or 'singing' in score_entry.contest_type.lower() %}Remarks:{% else %}Comments:{% endif %}</strong> {{ score_entry.comments }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if judge_all_scores|length > 1 %}
+                <div class="judge-scores-summary">
+                    <p><strong>Total Contests Scored:</strong> {{ judge_all_scores|length }}</p>
+                    <p><strong>Your Average Score:</strong> {{ "%.2f"|format(judge_avg_score) }}</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if contestant.contest_type == 'Instrument Playing Contest' %}
+            <!-- Detailed scoring for Instrument contest -->
+            <div class="instrument-scoring-section">
+                <h3>Scoring Criteria</h3>
+                
+                {% set detailed_scores = judge_existing_score.get('detailed_scores', {}) if judge_existing_score else {} %}
+                <div class="form-group">
+                    <label for="musical_instrument">Musical Instrument *</label>
+                    <input type="text" id="musical_instrument" name="musical_instrument" required 
+                           placeholder="Enter the instrument being used (e.g., Piano, Violin, Flute, etc.)"
+                           value="{{ detailed_scores.get('musical_instrument', '') }}">
+                    <small class="form-help">Enter the name of the musical instrument</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="poise_presentation">Poise and Presentation (1 - Low to 10 - High) *</label>
+                    <input type="number" id="poise_presentation" name="poise_presentation" required 
+                           min="1" max="10" step="1" 
+                           placeholder="Enter score (1-10)"
+                           value="{{ detailed_scores.get('poise_presentation', '') }}"
+                           oninput="calculateInstrumentTotal()">
+                    <small class="form-help">Score from 1 (Low) to 10 (High)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="technical_skill">Technical Skill (1 - Low to 10 - High) *</label>
+                    <input type="number" id="technical_skill" name="technical_skill" required 
+                           min="1" max="10" step="1" 
+                           placeholder="Enter score (1-10)"
+                           value="{{ detailed_scores.get('technical_skill', '') }}"
+                           oninput="calculateInstrumentTotal()">
+                    <small class="form-help">Score from 1 (Low) to 10 (High)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="musicality">Musicality (sound, melody, sensitivity) (1 - Low to 10 - High) *</label>
+                    <input type="number" id="musicality" name="musicality" required 
+                           min="1" max="10" step="1" 
+                           placeholder="Enter score (1-10)"
+                           value="{{ detailed_scores.get('musicality', '') }}"
+                           oninput="calculateInstrumentTotal()">
+                    <small class="form-help">Score from 1 (Low) to 10 (High)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="impact">Impact (1 - Low to 10 - High) *</label>
+                    <input type="number" id="impact" name="impact" required 
+                           min="1" max="10" step="1" 
+                           placeholder="Enter score (1-10)"
+                           value="{{ detailed_scores.get('impact', '') }}"
+                           oninput="calculateInstrumentTotal()">
+                    <small class="form-help">Score from 1 (Low) to 10 (High)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="score">Total (Out of 40 Points) *</label>
+                    <input type="number" id="score" name="score" required 
+                           min="4" max="40" step="1" 
+                           placeholder="Auto-calculated"
+                           readonly
+                           class="form-control-disabled"
+                           value="{{ judge_existing_score.score if judge_existing_score else '' }}">
+                    <small class="form-help">Automatically calculated from the above scores</small>
+                </div>
+            </div>
+            {% elif contestant.contest_type == 'Fancy Dress Contest' or contestant.contest_type == 'Fancy Dress' %}
+            <!-- Fancy Dress contest with "Dressed up as" field -->
+            <div class="instrument-scoring-section">
+                <h3>Fancy Dress Details</h3>
+                
+                {% set detailed_scores = judge_existing_score.get('detailed_scores', {}) if judge_existing_score else {} %}
+                <div class="form-group">
+                    <label for="dressed_up_as">Dressed up as *</label>
+                    <input type="text" id="dressed_up_as" name="dressed_up_as" required 
+                           placeholder="Enter what the participant was dressed up as (e.g., Doctor, Superhero, Animal, etc.)"
+                           value="{{ detailed_scores.get('dressed_up_as', '') }}">
+                    <small class="form-help">Enter what the participant was dressed up as</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="score">Score *</label>
+                    <input type="number" id="score" name="score" required 
+                           min="0" max="100" step="0.1" 
+                           placeholder="Enter score (0-100)"
+                           value="{{ judge_existing_score.score if judge_existing_score else '' }}">
+                    <small class="form-help">Enter a score between 0 and 100</small>
+                </div>
+            </div>
+            {% elif is_singing_contest %}
+            <!-- Detailed scoring for Singing contest -->
+            <div class="instrument-scoring-section">
+                <h3>Scoring Criteria</h3>
+                
+                {% set detailed_scores = judge_existing_score.get('detailed_scores', {}) if judge_existing_score else {} %}
+                <div class="form-group">
+                    <label for="voice_tone">Voice & Tone (1 - Low to 10 - High) *</label>
+                    <input type="number" id="voice_tone" name="voice_tone" required 
+                           min="1" max="10" step="1" 
+                           placeholder="Enter score (1-10)"
+                           value="{{ detailed_scores.get('voice_tone', '') }}"
+                           oninput="calculateSingingTotal()">
+                    <small class="form-help">Score from 1 (Low) to 10 (High)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="timing_beat">Timing & Beat (1 - Low to 10 - High) *</label>
+                    <input type="number" id="timing_beat" name="timing_beat" required 
+                           min="1" max="10" step="1" 
+                           placeholder="Enter score (1-10)"
+                           value="{{ detailed_scores.get('timing_beat', '') }}"
+                           oninput="calculateSingingTotal()">
+                    <small class="form-help">Score from 1 (Low) to 10 (High)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="pronunciation_lyrics">Pronunciation & Lyrics (1 - Low to 10 - High) *</label>
+                    <input type="number" id="pronunciation_lyrics" name="pronunciation_lyrics" required 
+                           min="1" max="10" step="1" 
+                           placeholder="Enter score (1-10)"
+                           value="{{ detailed_scores.get('pronunciation_lyrics', '') }}"
+                           oninput="calculateSingingTotal()">
+                    <small class="form-help">Score from 1 (Low) to 10 (High)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="impact">Impact (1 - Low to 10 - High) *</label>
+                    <input type="number" id="impact" name="impact" required 
+                           min="1" max="10" step="1" 
+                           placeholder="Enter score (1-10)"
+                           value="{{ detailed_scores.get('impact', '') }}"
+                           oninput="calculateSingingTotal()">
+                    <small class="form-help">Score from 1 (Low) to 10 (High)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="score">Total (Out of 40 Points) *</label>
+                    <input type="number" id="score" name="score" required 
+                           min="4" max="40" step="1" 
+                           placeholder="Auto-calculated"
+                           readonly
+                           class="form-control-disabled"
+                           value="{{ judge_existing_score.score if judge_existing_score else '' }}">
+                    <small class="form-help">Automatically calculated from the above scores</small>
+                </div>
+            </div>
+            {% else %}
+            <!-- Standard scoring for other contests -->
+            <div class="form-group">
+                <label for="score">Score *</label>
+                <input type="number" id="score" name="score" required 
+                       min="0" max="100" step="0.1" 
+                       placeholder="Enter score (0-100)"
+                       value="{{ judge_existing_score.score if judge_existing_score else '' }}">
+                <small class="form-help">Enter a score between 0 and 100</small>
+            </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="comments">{% if contestant.contest_type == 'Instrument Playing Contest' or is_singing_contest %}Remarks{% else %}Comments{% endif %} (Optional)</label>
+                <textarea id="comments" name="comments" rows="4" 
+                          placeholder="Enter any {% if contestant.contest_type == 'Instrument Playing Contest' or is_singing_contest %}remarks{% else %}comments or feedback{% endif %}...">{{ judge_existing_score.comments if judge_existing_score and judge_existing_score.comments else '' }}</textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-large">
+                    Submit Score
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                    Cancel
+                </button>
+            </div>
+        </form>
+
+        {% if all_scores %}
+        <div class="existing-score-info">
+            <h3>Current Scores ({{ stats.count }} judge{{ 's' if stats.count != 1 else '' }})</h3>
+            <div class="score-stats">
+                <p><strong>Average:</strong> {{ "%.2f"|format(stats.average) }}</p>
+                <p><strong>Total:</strong> {{ "%.2f"|format(stats.total) }}</p>
+            </div>
+            <div class="all-scores-list">
+                {% for judge_key, score_data in all_scores.items() %}
+                <div class="score-item">
+                    <div class="score-item-header">
+                        <strong>{{ score_data.judge_name if score_data.judge_name else judge_key }}</strong>
+                        <span class="score-value-small">{{ score_data.score }}{% if contestant.contest_type == 'Instrument Playing Contest' or is_singing_contest %} / 40{% endif %}</span>
+                    </div>
+                    {% if (contestant.contest_type == 'Fancy Dress Contest' or contestant.contest_type == 'Fancy Dress') and score_data.get('detailed_scores') %}
+                    {% set ds = score_data.get('detailed_scores', {}) %}
+                    <div class="detailed-scores-breakdown">
+                        {% if ds.get('dressed_up_as') %}
+                        <div class="score-breakdown-item" style="grid-column: 1 / -1; margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">
+                            <span class="breakdown-label">Dressed up as:</span>
+                            <span class="breakdown-value" style="font-weight: 600; color: var(--primary-color);">{{ ds.get('dressed_up_as') }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% elif contestant.contest_type == 'Instrument Playing Contest' and score_data.get('detailed_scores') %}
+                    {% set ds = score_data.get('detailed_scores', {}) %}
+                    <div class="detailed-scores-breakdown">
+                        {% if ds.get('musical_instrument') %}
+                        <div class="score-breakdown-item" style="grid-column: 1 / -1; margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">
+                            <span class="breakdown-label">Musical Instrument:</span>
+                            <span class="breakdown-value" style="font-weight: 600; color: var(--primary-color);">{{ ds.get('musical_instrument') }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="score-breakdown-item">
+                            <span class="breakdown-label">Poise and Presentation:</span>
+                            <span class="breakdown-value">{{ ds.get('poise_presentation', 0) }}/10</span>
+                        </div>
+                        <div class="score-breakdown-item">
+                            <span class="breakdown-label">Technical Skill:</span>
+                            <span class="breakdown-value">{{ ds.get('technical_skill', 0) }}/10</span>
+                        </div>
+                        <div class="score-breakdown-item">
+                            <span class="breakdown-label">Musicality:</span>
+                            <span class="breakdown-value">{{ ds.get('musicality', 0) }}/10</span>
+                        </div>
+                        <div class="score-breakdown-item">
+                            <span class="breakdown-label">Impact:</span>
+                            <span class="breakdown-value">{{ ds.get('impact', 0) }}/10</span>
+                        </div>
+                    </div>
+                    {% elif is_singing_contest and score_data.get('detailed_scores') %}
+                    {% set ds = score_data.get('detailed_scores', {}) %}
+                    <div class="detailed-scores-breakdown">
+                        <div class="score-breakdown-item">
+                            <span class="breakdown-label">Voice & Tone:</span>
+                            <span class="breakdown-value">{{ ds.get('voice_tone', 0) }}/10</span>
+                        </div>
+                        <div class="score-breakdown-item">
+                            <span class="breakdown-label">Timing & Beat:</span>
+                            <span class="breakdown-value">{{ ds.get('timing_beat', 0) }}/10</span>
+                        </div>
+                        <div class="score-breakdown-item">
+                            <span class="breakdown-label">Pronunciation & Lyrics:</span>
+                            <span class="breakdown-value">{{ ds.get('pronunciation_lyrics', 0) }}/10</span>
+                        </div>
+                        <div class="score-breakdown-item">
+                            <span class="breakdown-label">Impact:</span>
+                            <span class="breakdown-value">{{ ds.get('impact', 0) }}/10</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <p class="score-timestamp">{{ score_data.timestamp[:19] if score_data.timestamp else 'N/A' }}</p>
+                    {% if score_data.comments %}
+                    <p class="score-comments"><strong>{% if contestant.contest_type == 'Instrument Playing Contest' or is_singing_contest %}Remarks:{% else %}Comments:{% endif %}</strong> {{ score_data.comments }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% if not is_admin_user %}
+            <p class="section-subtitle" style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
+                Note: Participant names are hidden. Use Participant ID to identify contestants.
+            </p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-calculate total for Instrument contest
+function calculateInstrumentTotal() {
+    const isInstrument = {{ 'true' if contestant.contest_type == 'Instrument Playing Contest' else 'false' }};
+    if (!isInstrument) return;
+    
+    const poise = parseFloat(document.getElementById('poise_presentation').value) || 0;
+    const technical = parseFloat(document.getElementById('technical_skill').value) || 0;
+    const musicality = parseFloat(document.getElementById('musicality').value) || 0;
+    const impact = parseFloat(document.getElementById('impact').value) || 0;
+    
+    const total = poise + technical + musicality + impact;
+    document.getElementById('score').value = total;
+}
+
+// Auto-calculate total for Singing contest
+function calculateSingingTotal() {
+    const isSinging = {{ 'true' if is_singing_contest else 'false' }};
+    if (!isSinging) return;
+    
+    const voiceTone = parseFloat(document.getElementById('voice_tone').value) || 0;
+    const timingBeat = parseFloat(document.getElementById('timing_beat').value) || 0;
+    const pronunciationLyrics = parseFloat(document.getElementById('pronunciation_lyrics').value) || 0;
+    const impact = parseFloat(document.getElementById('impact').value) || 0;
+    
+    const total = voiceTone + timingBeat + pronunciationLyrics + impact;
+    document.getElementById('score').value = total;
+}
+
+// Initialize total calculation on page load
+{% if contestant.contest_type == 'Instrument Playing Contest' %}
+document.addEventListener('DOMContentLoaded', function() {
+    calculateInstrumentTotal();
+});
+{% elif is_singing_contest %}
+document.addEventListener('DOMContentLoaded', function() {
+    calculateSingingTotal();
+});
+{% endif %}
+
+document.getElementById('scoreForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const isInstrument = {{ 'true' if contestant.contest_type == 'Instrument Playing Contest' else 'false' }};
+    const isSinging = {{ 'true' if is_singing_contest else 'false' }};
+    const isFancyDress = {{ 'true' if contestant.contest_type == 'Fancy Dress Contest' or contestant.contest_type == 'Fancy Dress' else 'false' }};
+    
+    const formData = {
+        contestant_id: parseInt(document.getElementById('contestantId').value),
+        judge_name: document.getElementById('judgeName').value.trim(),
+        score: parseFloat(document.getElementById('score').value),
+        comments: document.getElementById('comments').value.trim()
+    };
+    
+    // Add detailed scores for Fancy Dress contest
+    if (isFancyDress) {
+        const dressedUpAs = document.getElementById('dressed_up_as').value.trim();
+        if (!dressedUpAs) {
+            alert('Please enter what the participant was dressed up as');
+            return;
+        }
+        
+        formData.detailed_scores = {
+            dressed_up_as: dressedUpAs
+        };
+    }
+    // Add detailed scores for Instrument contest
+    else if (isInstrument) {
+        const musicalInstrument = document.getElementById('musical_instrument').value.trim();
+        if (!musicalInstrument) {
+            alert('Please enter the Musical Instrument');
+            return;
+        }
+        
+        formData.detailed_scores = {
+            musical_instrument: musicalInstrument,
+            poise_presentation: parseFloat(document.getElementById('poise_presentation').value),
+            technical_skill: parseFloat(document.getElementById('technical_skill').value),
+            musicality: parseFloat(document.getElementById('musicality').value),
+            impact: parseFloat(document.getElementById('impact').value)
+        };
+        
+        // Validate detailed scores
+        if (!formData.detailed_scores.poise_presentation || 
+            !formData.detailed_scores.technical_skill || 
+            !formData.detailed_scores.musicality || 
+            !formData.detailed_scores.impact) {
+            alert('Please fill in all scoring criteria (Poise, Technical Skill, Musicality, and Impact)');
+            return;
+        }
+        
+        // Validate each score is between 1 and 10 (exclude musical_instrument which is text)
+        for (const [key, value] of Object.entries(formData.detailed_scores)) {
+            if (key === 'musical_instrument') continue; // Skip text field
+            if (typeof value === 'number' && (value < 1 || value > 10)) {
+                alert(`${key.replace('_', ' ')} must be between 1 and 10`);
+                return;
+            }
+        }
+        
+        // Validate total
+        if (formData.score < 4 || formData.score > 40) {
+            alert('Total score must be between 4 and 40');
+            return;
+        }
+    } else if (isSinging) {
+        // Add detailed scores for Singing contest
+        formData.detailed_scores = {
+            voice_tone: parseFloat(document.getElementById('voice_tone').value),
+            timing_beat: parseFloat(document.getElementById('timing_beat').value),
+            pronunciation_lyrics: parseFloat(document.getElementById('pronunciation_lyrics').value),
+            impact: parseFloat(document.getElementById('impact').value)
+        };
+        
+        // Validate detailed scores
+        if (!formData.detailed_scores.voice_tone || 
+            !formData.detailed_scores.timing_beat || 
+            !formData.detailed_scores.pronunciation_lyrics || 
+            !formData.detailed_scores.impact) {
+            alert('Please fill in all scoring criteria (Voice & Tone, Timing & Beat, Pronunciation & Lyrics, and Impact)');
+            return;
+        }
+        
+        // Validate each score is between 1 and 10
+        for (const [key, value] of Object.entries(formData.detailed_scores)) {
+            if (value < 1 || value > 10) {
+                alert(`${key.replace('_', ' ')} must be between 1 and 10`);
+                return;
+            }
+        }
+        
+        // Validate total
+        if (formData.score < 4 || formData.score > 40) {
+            alert('Total score must be between 4 and 40');
+            return;
+        }
+    } else {
+        // Standard validation for non-Instrument contests
+        if (!formData.judge_name || formData.score === null || isNaN(formData.score)) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        if (formData.score < 0 || formData.score > 100) {
+            alert('Score must be between 0 and 100');
+            return;
+        }
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
+    try {
+        const response = await fetch('/api/submit_score', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert('Score submitted successfully!');
+            window.location.href = '/';
+        } else {
+            alert('Error: ' + (data.error || 'Failed to submit score'));
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Score';
+        }
+    } catch (error) {
+        alert('Error submitting score: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Score';
+    }
+});
+</script>
+{% endblock %}

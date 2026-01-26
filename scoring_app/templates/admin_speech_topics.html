@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Speech Topics - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Manage Speech Topics</h2>
+    <p class="subtitle">Enter speech topic names by age group for prepared speech contests</p>
+    <p class="subtitle" style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem;">
+        💬 Supports multiple languages: English, हिंदी (Hindi), ગુજરાતી (Gujarati), తెలుగు (Telugu)
+    </p>
+</div>
+
+<div class="admin-speech-topics-container">
+    {% if grouped_by_age %}
+    <!-- Tab Navigation -->
+    <div class="tabs-container">
+        <div class="tabs-nav">
+            {% for contest_type, age_groups in grouped_by_age.items() %}
+            <button class="tab-button {% if loop.first %}active{% endif %}" 
+                    onclick="openTab(event, 'topic-tab-{{ loop.index0 }}')"
+                    data-tab="topic-tab-{{ loop.index0 }}">
+                {{ contest_type }}
+                <span class="tab-count">({{ age_groups|length }} age groups)</span>
+            </button>
+            {% endfor %}
+        </div>
+
+        <!-- Tab Content -->
+        {% for contest_type, age_groups in grouped_by_age.items() %}
+        <div id="topic-tab-{{ loop.index0 }}" class="tab-content {% if loop.first %}active{% endif %}">
+            <div class="table-container">
+                <table class="speech-topics-table">
+                    <thead>
+                        <tr>
+                            <th>Age Group</th>
+                            <th>Participants</th>
+                            <th>Speech Topic</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for age_group, group_data in age_groups.items() %}
+                        <tr>
+                            <td>
+                                <strong>{{ age_group }}</strong>
+                            </td>
+                            <td>
+                                <span class="participant-count-badge">{{ group_data.participant_count }} participant{{ 's' if group_data.participant_count != 1 else '' }}</span>
+                                {% if group_data.participants %}
+                                <div class="sample-participants" style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
+                                    <em>Examples: 
+                                    {% for p in group_data.participants[:3] %}
+                                        {{ p.participant_id if p.participant_id else p.id }}{% if not loop.last %}, {% endif %}
+                                    {% endfor %}
+                                    {% if group_data.participant_count > 3 %}...{% endif %}
+                                    </em>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <input type="text" 
+                                       class="speech-topic-input" 
+                                       id="topic-{{ loop.index0 }}-{{ loop.index }}"
+                                       value="{{ group_data.topic }}"
+                                       placeholder="Enter speech topic (English, Hindi, Gujarati, or Telugu)..."
+                                       data-contest-type="{{ contest_type }}"
+                                       data-age-group="{{ age_group }}"
+                                       lang="hi"
+                                       dir="auto">
+                                <small class="form-help" style="display: block; margin-top: 0.25rem; color: var(--text-secondary); font-size: 0.8rem;">
+                                    Supports: English, हिंदी (Hindi), ગુજરાતી (Gujarati), తెలుగు (Telugu)
+                                </small>
+                            </td>
+                            <td>
+                                <button class="btn btn-small btn-primary" 
+                                        onclick="saveTopic('{{ contest_type }}', '{{ age_group }}', {{ loop.index0 }}, {{ loop.index }})">
+                                    Save
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p>No prepared speech contestants found.</p>
+    {% endif %}
+</div>
+
+<script>
+function saveTopic(contestType, ageGroup, tabIndex, rowIndex) {
+    const input = document.getElementById('topic-' + tabIndex + '-' + rowIndex);
+    const topic = input.value.trim();
+    
+    const submitBtn = event.target;
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+    
+    fetch('/api/update_speech_topic', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            contest_type: contestType,
+            age_group: ageGroup,
+            topic: topic
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success feedback
+            submitBtn.textContent = 'Saved!';
+            submitBtn.style.background = 'var(--success-color)';
+            setTimeout(() => {
+                submitBtn.textContent = originalText;
+                submitBtn.style.background = '';
+                submitBtn.disabled = false;
+            }, 1500);
+        } else {
+            alert('Error: ' + (data.error || 'Failed to save topic'));
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        alert('Error saving topic: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    });
+}
+
+// Tab switching function
+function openTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].classList.remove("active");
+    }
+    tablinks = document.getElementsByClassName("tab-button");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].classList.remove("active");
+    }
+    document.getElementById(tabName).classList.add("active");
+    evt.currentTarget.classList.add("active");
+}
+
+// Auto-save on Enter key
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = document.querySelectorAll('.speech-topic-input');
+    inputs.forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const contestType = this.getAttribute('data-contest-type');
+                const ageGroup = this.getAttribute('data-age-group');
+                const idParts = this.id.split('-');
+                const tabIndex = idParts[1];
+                const rowIndex = idParts[2];
+                saveTopic(contestType, ageGroup, tabIndex, rowIndex);
+            }
+        });
+    });
+});
+</script>
+
+<style>
+.speech-topics-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.speech-topics-table th,
+.speech-topics-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.speech-topics-table th {
+    background: var(--bg-color);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.speech-topic-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Devanagari', 'Gujarati', 'Telugu', sans-serif;
+    unicode-bidi: plaintext;
+    direction: auto;
+}
+
+.speech-topic-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.speech-topic-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.participant-count-badge {
+    display: inline-block;
+    background: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.sample-participants {
+    margin-top: 0.25rem;
+}
+</style>
+{% endblock %}

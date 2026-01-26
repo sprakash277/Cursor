@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Contestants - Contest Scoring System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Contestants by Contest Type</h2>
+    <p class="subtitle">Select a contestant to enter scores</p>
+    {% if judge_username %}
+    <p class="subtitle" style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem;">
+        Showing only your assigned contests
+    </p>
+    {% endif %}
+    {% if not is_admin_user and judge_username %}
+    <p class="subtitle" style="font-size: 0.85rem; color: var(--warning-color); margin-top: 0.5rem; font-style: italic;">
+        ⚠️ Participant names are hidden - use Participant IDs to identify contestants
+    </p>
+    {% endif %}
+</div>
+
+{% if grouped_contestants %}
+    <!-- Tab Navigation -->
+    <div class="tabs-container">
+        <div class="tabs-nav">
+            {% for contest_type, contestants in grouped_contestants.items() %}
+            <button class="tab-button {% if loop.first %}active{% endif %}" 
+                    onclick="openTab(event, 'tab-{{ loop.index0 }}')"
+                    data-tab="tab-{{ loop.index0 }}">
+                {{ contest_type }}
+                <span class="tab-count">({{ contestants|length }})</span>
+            </button>
+            {% endfor %}
+        </div>
+
+        <!-- Tab Content -->
+        {% for contest_type, contestants in grouped_contestants.items() %}
+        <div id="tab-{{ loop.index0 }}" class="tab-content {% if loop.first %}active{% endif %}">
+            <div class="tab-header">
+                <h3>{{ contest_type }}</h3>
+                <p class="tab-subtitle">{{ contestants|length }} participant{{ 's' if contestants|length != 1 else '' }}</p>
+            </div>
+            
+            <!-- Table View -->
+            <div id="table-view-{{ loop.index0 }}" class="contest-table-view">
+                {% set contest_age_groups = grouped_by_age.get(contest_type, {}) %}
+                {% for age_group, age_group_data in contest_age_groups.items() %}
+                    {% set group_num = age_group_data.group_num %}
+                    {% set group_contestants = age_group_data.contestants %}
+                    <div class="age-group-table-section" data-group="{{ group_num }}">
+                        <h4 class="age-group-header group-{{ group_num }}">{{ age_group }}</h4>
+                        <table class="contestants-table-view">
+                            <thead>
+                                <tr>
+                                    <th>Participant ID</th>
+                                    {% if is_admin_user %}
+                                    <th>Name</th>
+                                    {% endif %}
+                                    <th>Age</th>
+                                    <th>Average Score</th>
+                                    <th>Judges</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contestant in group_contestants %}
+                                {% set contestant_id_str = contestant.id|string %}
+                                {% set stats = contestant_stats.get(contestant_id_str, {'average': 0, 'count': 0}) %}
+                                <tr class="group-{{ group_num }}-row">
+                                    <td>
+                                        {% if contestant.participant_id %}
+                                            <strong>{{ contestant.participant_id }}</strong>
+                                        {% else %}
+                                            {{ contestant.id }}
+                                        {% endif %}
+                                        {% if contestant.is_walkin %}
+                                            <span class="walkin-badge-small">W</span>
+                                        {% endif %}
+                                    </td>
+                                    {% if is_admin_user %}
+                                    <td><strong>{{ contestant.name }}</strong></td>
+                                    {% endif %}
+                                    <td>{{ contestant.age if contestant.age else 'N/A' }}</td>
+                                    <td>
+                                        {% if stats.count > 0 %}
+                                            <span class="score-value">{{ "%.2f"|format(stats.average) }}</span>
+                                        {% else %}
+                                            <span class="no-scores">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ stats.count }} judge{{ 's' if stats.count != 1 else '' }}</td>
+                                    <td>
+                                        {% if session.get('judge_username') %}
+                                            <a href="{{ url_for('score_contestant', contestant_id=contestant.id) }}" class="btn btn-small btn-primary">
+                                                Score
+                                            </a>
+                                        {% else %}
+                                            <a href="{{ url_for('login', next=url_for('score_contestant', contestant_id=contestant.id)) }}" class="btn btn-small btn-primary">
+                                                Login to Score
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endfor %}
+            </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <p>No contestants found{% if judge_username %} for your assigned contests{% endif %}.</p>
+        {% if judge_username %}
+        <p style="margin-top: 1rem; font-size: 0.9rem;">Please contact the administrator if you believe you should have access to more contests.</p>
+        {% else %}
+        <p style="margin-top: 1rem; font-size: 0.9rem;">Please check the Excel file or login to view assigned contests.</p>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    
+    // Hide all tab content
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].classList.remove("active");
+    }
+    
+    // Remove active class from all tab buttons
+    tablinks = document.getElementsByClassName("tab-button");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].classList.remove("active");
+    }
+    
+    // Show the selected tab content and mark button as active
+    document.getElementById(tabName).classList.add("active");
+    evt.currentTarget.classList.add("active");
+    
+    // Store active tab in sessionStorage
+    sessionStorage.setItem('activeTab', tabName);
+}
+
+// Restore active tab from sessionStorage on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const activeTab = sessionStorage.getItem('activeTab');
+    if (activeTab) {
+        const tabButton = document.querySelector(`[data-tab="${activeTab}"]`);
+        if (tabButton) {
+            tabButton.click();
+        }
+    }
+});
+
+</script>
+{% endblock %}

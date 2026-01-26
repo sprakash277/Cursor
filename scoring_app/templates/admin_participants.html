@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Participants - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Manage Participants</h2>
+    <p class="subtitle">View and manage participants by contest type</p>
+</div>
+
+<div class="admin-participants-container">
+    <!-- Filters -->
+    <div class="filters-section">
+        <h3>Filters</h3>
+        <div class="filters-grid">
+            <div class="filter-group">
+                <label for="filter-name">Name</label>
+                <input type="text" id="filter-name" placeholder="Filter by name..." onkeyup="filterTable()">
+            </div>
+            <div class="filter-group">
+                <label for="filter-contest">Contest Type</label>
+                <input type="text" id="filter-contest" placeholder="Filter by contest..." onkeyup="filterTable()">
+            </div>
+            <div class="filter-group">
+                <label for="filter-age">Age</label>
+                <input type="number" id="filter-age" placeholder="Filter by age..." onkeyup="filterTable()">
+            </div>
+            <div class="filter-group">
+                <label for="filter-age-group">Age Group</label>
+                <input type="text" id="filter-age-group" placeholder="Filter by age group..." onkeyup="filterTable()">
+            </div>
+            <div class="filter-group">
+                <button class="btn btn-secondary" onclick="clearFilters()">Clear Filters</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contest Groups with Expand/Collapse -->
+    <div class="contest-groups-container">
+        {% for contest_type, contestants_list in grouped_by_contest.items() %}
+        <div class="contest-group" data-contest="{{ contest_type|lower }}">
+            <div class="contest-group-header" onclick="toggleContestGroup('{{ loop.index0 }}')">
+                <div class="contest-group-title">
+                    <span class="expand-icon" id="icon-{{ loop.index0 }}">▶</span>
+                    <h3>{{ contest_type }}</h3>
+                    <span class="participant-count-badge">{{ contestants_list|length }} participant{{ 's' if contestants_list|length != 1 else '' }}</span>
+                </div>
+                <div class="contest-group-actions">
+                    <button class="btn btn-small btn-success" onclick="event.stopPropagation(); showAddParticipantModal('{{ contest_type }}')">
+                        + Add Participant
+                    </button>
+                </div>
+            </div>
+            
+            <div class="contest-group-content" id="content-{{ loop.index0 }}" style="display: none;">
+                <div class="table-container">
+                    <table class="participants-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Participant ID</th>
+                                <th>Name</th>
+                                <th>Order Item</th>
+                                <th>Age</th>
+                                <th>Age Group</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for contestant in contestants_list %}
+                            <tr data-name="{{ contestant.name|lower }}" 
+                                data-contest="{{ contest_type|lower }}"
+                                data-age="{{ contestant.age if contestant.age else '' }}"
+                                data-age-group="{{ contestant.age_group|lower if contestant.age_group else '' }}"
+                                data-contestant-id="{{ contestant.id }}">
+                                <td class="row-number">{{ loop.index }}</td>
+                                <td>
+                                    <strong>{{ contestant.participant_id if contestant.participant_id else contestant.id }}</strong>
+                                    {% if contestant.is_walkin %}<span class="walkin-badge-small">W</span>{% endif %}
+                                </td>
+                                <td>
+                                    <span class="editable-field" 
+                                          data-field="name" 
+                                          data-original="{{ contestant.original_name }}"
+                                          data-current="{{ contestant.name }}"
+                                          onclick="editField(this)">
+                                        {{ contestant.name }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="order-item-text" title="{{ contestant.order_item if contestant.order_item else 'N/A' }}">
+                                        {{ contestant.order_item if contestant.order_item else 'N/A' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="editable-field" 
+                                          data-field="age" 
+                                          data-original="{{ contestant.original_name }}"
+                                          data-current="{{ contestant.age if contestant.age else '' }}"
+                                          onclick="editField(this)">
+                                        {{ contestant.age if contestant.age else 'N/A' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="editable-field" 
+                                          data-field="age_group" 
+                                          data-original="{{ contestant.original_name }}"
+                                          data-current="{{ contestant.age_group if contestant.age_group else '' }}"
+                                          onclick="editField(this)">
+                                        {{ contestant.age_group if contestant.age_group else 'N/A' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-small btn-primary" onclick="editParticipant('{{ contestant.original_name }}')">
+                                        Edit
+                                    </button>
+                                    {% if contestant.is_walkin %}
+                                    <button class="btn btn-small btn-danger" onclick="deleteParticipant({{ contestant.id }}, '{{ contestant.name }}', '{{ contest_type }}')">
+                                        Delete
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-content modal-large">
+        <span class="close" onclick="closeEditModal()">&times;</span>
+        <h3>Edit Participant</h3>
+        <form id="editForm" onsubmit="saveParticipant(event)">
+            <input type="hidden" id="edit-original-name" name="original_name">
+            
+            <div class="form-group">
+                <label for="edit-name">Participant Name *</label>
+                <input type="text" id="edit-name" name="name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-age">Age</label>
+                <input type="number" id="edit-age" name="age" min="0" max="100"
+                       onchange="updateEditAgeGroup()">
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-age-group">Age Group</label>
+                <input type="text" id="edit-age-group" name="age_group" 
+                       placeholder="e.g., Group 2: 8-10 yrs"
+                       readonly
+                       class="form-control-disabled">
+                <small class="form-help">Auto-assigned based on age (read-only)</small>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Participant Modal -->
+<div id="addParticipantModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeAddParticipantModal()">&times;</span>
+        <h3>Add New Participant</h3>
+        <form id="addParticipantForm" onsubmit="addParticipant(event)">
+            <input type="hidden" id="add-contest-type" name="contest_type">
+            
+            <div class="form-group">
+                <label for="add-name">Participant Name *</label>
+                <input type="text" id="add-name" name="name" required placeholder="Enter participant name">
+            </div>
+            
+            <div class="form-group">
+                <label for="add-age">Age *</label>
+                <input type="number" id="add-age" name="age" min="0" max="100" required
+                       placeholder="Enter age"
+                       onchange="updateAddAgeGroup()">
+                <small class="form-help">Age as of Jan 23rd, 2026. Age group will be auto-assigned.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="add-age-group">Age Group</label>
+                <input type="text" id="add-age-group" name="age_group" readonly
+                       class="form-control-disabled"
+                       placeholder="Will be auto-assigned based on age">
+                <small class="form-help">Auto-assigned based on age (read-only)</small>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Add Participant</button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddParticipantModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentEditingField = null;
+
+// Expand/Collapse functionality
+function toggleContestGroup(index) {
+    const content = document.getElementById('content-' + index);
+    const icon = document.getElementById('icon-' + index);
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        content.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
+// Expand all by default
+document.addEventListener('DOMContentLoaded', function() {
+    const groups = document.querySelectorAll('.contest-group-content');
+    groups.forEach((group, index) => {
+        group.style.display = 'block';
+        const icon = document.getElementById('icon-' + index);
+        if (icon) icon.textContent = '▼';
+    });
+});
+
+function filterTable() {
+    const nameFilter = document.getElementById('filter-name').value.toLowerCase();
+    const contestFilter = document.getElementById('filter-contest').value.toLowerCase();
+    const ageFilter = document.getElementById('filter-age').value;
+    const ageGroupFilter = document.getElementById('filter-age-group').value.toLowerCase();
+    
+    const contestGroups = document.querySelectorAll('.contest-group');
+    let visibleRowNumber = 1;
+    
+    contestGroups.forEach(group => {
+        const contestType = group.getAttribute('data-contest') || '';
+        const contestMatch = contestType.includes(contestFilter);
+        
+        if (!contestMatch && contestFilter) {
+            group.style.display = 'none';
+            return;
+        }
+        
+        group.style.display = 'block';
+        const rows = group.querySelectorAll('tbody tr');
+        let hasVisibleRows = false;
+        
+        rows.forEach(row => {
+            const name = row.getAttribute('data-name') || '';
+            const age = row.getAttribute('data-age') || '';
+            const ageGroup = row.getAttribute('data-age-group') || '';
+            
+            const nameMatch = name.includes(nameFilter);
+            const ageMatch = !ageFilter || age === ageFilter || age.includes(ageFilter);
+            const ageGroupMatch = ageGroup.includes(ageGroupFilter);
+            
+            if (nameMatch && ageMatch && ageGroupMatch) {
+                row.style.display = '';
+                const rowNumberCell = row.querySelector('.row-number');
+                if (rowNumberCell) {
+                    rowNumberCell.textContent = visibleRowNumber;
+                }
+                visibleRowNumber++;
+                hasVisibleRows = true;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        // Hide contest group if no visible rows
+        if (!hasVisibleRows && (nameFilter || ageFilter || ageGroupFilter)) {
+            group.style.display = 'none';
+        }
+    });
+}
+
+function clearFilters() {
+    document.getElementById('filter-name').value = '';
+    document.getElementById('filter-contest').value = '';
+    document.getElementById('filter-age').value = '';
+    document.getElementById('filter-age-group').value = '';
+    filterTable();
+}
+
+function editField(element) {
+    // Inline editing functionality (if needed)
+    // For now, just open the edit modal
+    const row = element.closest('tr');
+    if (!row) return;
+    
+    const originalName = row.querySelector('[data-field="name"]').getAttribute('data-original');
+    editParticipant(originalName);
+}
+
+function editParticipant(originalName) {
+    const row = document.querySelector(`tr[data-name="${originalName.toLowerCase()}"]`);
+    if (!row) return;
+    
+    const nameField = row.querySelector('[data-field="name"]');
+    const ageField = row.querySelector('[data-field="age"]');
+    const ageGroupField = row.querySelector('[data-field="age_group"]');
+    
+    document.getElementById('edit-original-name').value = originalName;
+    document.getElementById('edit-name').value = nameField.getAttribute('data-current');
+    const ageValue = ageField.getAttribute('data-current') || '';
+    document.getElementById('edit-age').value = ageValue;
+    
+    if (ageValue) {
+        document.getElementById('edit-age').dispatchEvent(new Event('change'));
+    } else {
+        document.getElementById('edit-age-group').value = ageGroupField.getAttribute('data-current') || '';
+    }
+    
+    document.getElementById('editModal').style.display = 'block';
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+
+function updateEditAgeGroup() {
+    const ageInput = document.getElementById('edit-age');
+    const ageGroupInput = document.getElementById('edit-age-group');
+    const age = parseInt(ageInput.value);
+    
+    if (isNaN(age) || age < 0) {
+        ageGroupInput.value = '';
+        return;
+    }
+    
+    let ageGroup = '';
+    if (age < 5) {
+        ageGroup = 'Group 0: Below 5 yrs';
+    } else if (age >= 5 && age <= 7) {
+        ageGroup = 'Group 1: 5-7 yrs';
+    } else if (age >= 8 && age <= 10) {
+        ageGroup = 'Group 2: 8-10 yrs';
+    } else if (age >= 11 && age <= 14) {
+        ageGroup = 'Group 3: 11-14 yrs';
+    } else if (age >= 15 && age <= 18) {
+        ageGroup = 'Group 4: 15-18 yrs';
+    } else {
+        ageGroup = 'Group 4: 15-18 yrs';
+    }
+    
+    ageGroupInput.value = ageGroup;
+}
+
+async function saveParticipant(event) {
+    event.preventDefault();
+    
+    const formData = {
+        original_name: document.getElementById('edit-original-name').value,
+        name: document.getElementById('edit-name').value.trim(),
+        age: document.getElementById('edit-age').value.trim() || null,
+        age_group: document.getElementById('edit-age-group').value.trim() || null
+    };
+    
+    if (!formData.name) {
+        alert('Name is required');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/update_participant', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Participant updated successfully! Changes will be reflected after page refresh.');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to update participant'));
+        }
+    } catch (error) {
+        alert('Error updating participant: ' + error.message);
+    }
+}
+
+// Add Participant functionality
+function showAddParticipantModal(contestType) {
+    document.getElementById('add-contest-type').value = contestType;
+    document.getElementById('add-name').value = '';
+    document.getElementById('add-age').value = '';
+    document.getElementById('add-age-group').value = '';
+    document.getElementById('addParticipantModal').style.display = 'block';
+}
+
+function closeAddParticipantModal() {
+    document.getElementById('addParticipantModal').style.display = 'none';
+}
+
+function updateAddAgeGroup() {
+    const ageInput = document.getElementById('add-age');
+    const ageGroupInput = document.getElementById('add-age-group');
+    const age = parseInt(ageInput.value);
+    
+    if (isNaN(age) || age < 0) {
+        ageGroupInput.value = '';
+        return;
+    }
+    
+    let ageGroup = '';
+    if (age < 5) {
+        ageGroup = 'Group 0: Below 5 yrs';
+    } else if (age >= 5 && age <= 7) {
+        ageGroup = 'Group 1: 5-7 yrs';
+    } else if (age >= 8 && age <= 10) {
+        ageGroup = 'Group 2: 8-10 yrs';
+    } else if (age >= 11 && age <= 14) {
+        ageGroup = 'Group 3: 11-14 yrs';
+    } else if (age >= 15 && age <= 18) {
+        ageGroup = 'Group 4: 15-18 yrs';
+    } else {
+        ageGroup = 'Group 4: 15-18 yrs';
+    }
+    
+    ageGroupInput.value = ageGroup;
+}
+
+async function addParticipant(event) {
+    event.preventDefault();
+    
+    const formData = {
+        name: document.getElementById('add-name').value.trim(),
+        contest_type: document.getElementById('add-contest-type').value,
+        age: document.getElementById('add-age').value.trim() || null,
+        age_group: document.getElementById('add-age-group').value.trim() || null
+    };
+    
+    if (!formData.name || !formData.contest_type) {
+        alert('Name and contest type are required');
+        return;
+    }
+    
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Adding...';
+    
+    try {
+        const response = await fetch('/api/add_participant_to_contest', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Participant added successfully! Page will refresh.');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to add participant'));
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    } catch (error) {
+        alert('Error adding participant: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+}
+
+// Delete Participant functionality
+async function deleteParticipant(contestantId, name, contestType) {
+    if (!confirm(`Are you sure you want to delete "${name}" from "${contestType}"?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/delete_participant_from_contest', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                contestant_id: contestantId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Participant deleted successfully! Page will refresh.');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to delete participant'));
+        }
+    } catch (error) {
+        alert('Error deleting participant: ' + error.message);
+    }
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const editModal = document.getElementById('editModal');
+    const addModal = document.getElementById('addParticipantModal');
+    if (event.target == editModal) {
+        closeEditModal();
+    }
+    if (event.target == addModal) {
+        closeAddParticipantModal();
+    }
+}
+</script>
+
+<style>
+.contest-groups-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.contest-group {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.contest-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.contest-group-header:hover {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+}
+
+.contest-group-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+}
+
+.expand-icon {
+    font-size: 0.9rem;
+    transition: transform 0.2s;
+    min-width: 20px;
+}
+
+.contest-group-title h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.participant-count-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.contest-group-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.contest-group-content {
+    padding: 1rem;
+}
+
+.walkin-badge-small {
+    display: inline-block;
+    background: var(--warning-color);
+    color: white;
+    padding: 0.15rem 0.4rem;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+</style>
+{% endblock %}

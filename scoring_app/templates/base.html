@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Contest Scoring System{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='images/sanskriti_logo.png') }}" 
+                     alt="Sanskriti RKT 2026 Contest" 
+                     class="sanskriti-logo">
+                <div class="logo-text">
+                    <h1 class="logo">Sanskriti RKT 2026 Contest</h1>
+                    <p class="event-subtitle">Contest Scoring System</p>
+                </div>
+            </div>
+            <ul class="nav-links">
+                {% if session.get('judge_username') %}
+                    <li><span class="judge-name">👤 {{ session.get('judge_name', 'Judge') }}</span></li>
+                    <li><a href="{{ url_for('index') }}">Home</a></li>
+                    <li><a href="{{ url_for('results') }}">Results</a></li>
+                    {% if session.get('is_admin') %}
+                    <li><a href="{{ url_for('walkin_participant') }}">Add Walk-in</a></li>
+                    <li><a href="{{ url_for('admin_participants') }}">Manage Participants</a></li>
+                    <li><a href="{{ url_for('admin_users') }}">Manage Users</a></li>
+                    <li><a href="{{ url_for('admin_speech_topics') }}">Speech Topics</a></li>
+                    {% endif %}
+                    <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                {% else %}
+                    <li><a href="{{ url_for('login') }}">Login</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Sanskriti RKT 2026 Contest - Contest Scoring System</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

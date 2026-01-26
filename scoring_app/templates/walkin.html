@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Add Walk-in Participant - Contest Scoring System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Add Walk-in Participant</h2>
+    <p class="subtitle">Register new participants on the day of the contest</p>
+</div>
+
+<div class="walkin-container">
+    <div class="walkin-form-section">
+        <h3>Register New Participant</h3>
+        <form method="POST" action="{{ url_for('walkin_participant') }}" class="walkin-form">
+            <div class="form-group">
+                <label for="name">Participant Name *</label>
+                <input type="text" id="name" name="name" required 
+                       placeholder="Enter participant's full name"
+                       autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="contest_type">Contest Type *</label>
+                <select id="contest_type" name="contest_type" required class="form-select">
+                    <option value="">Select a contest type...</option>
+                    {% for contest in contest_types %}
+                    <option value="{{ contest }}">{{ contest }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="age">Age *</label>
+                <input type="number" id="age" name="age" min="0" max="100" required
+                       placeholder="Enter age"
+                       onchange="updateAgeGroup()">
+                <small class="form-help">Age as of Jan 23rd, 2026. Age group will be auto-assigned.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="age_group">Age Group</label>
+                <input type="text" id="age_group" name="age_group" readonly
+                       class="form-control-disabled"
+                       placeholder="Will be auto-assigned based on age">
+                <small class="form-help">Auto-assigned based on age (read-only)</small>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-large" onclick="return validateWalkinForm(event)">
+                    Add Participant
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="walkin-list-section">
+        <h3>Walk-in Participants ({{ walkin_participants|length }})</h3>
+        {% if walkin_participants %}
+        <div class="walkin-participants-list">
+            {% for participant in walkin_participants %}
+            <div class="walkin-item">
+                <div class="walkin-item-header">
+                    <div>
+                        <strong>{{ participant.name }}</strong>
+                        <span class="walkin-badge">Walk-in</span>
+                    </div>
+                    <button class="btn btn-small btn-danger" 
+                            onclick="deleteWalkin('{{ participant.name }}', '{{ participant.contest_type }}')">
+                        Delete
+                    </button>
+                </div>
+                <p class="walkin-contest">{{ participant.contest_type }}</p>
+                {% if participant.age_group %}
+                <p class="walkin-age-group">Age Group: {{ participant.age_group }}</p>
+                {% endif %}
+                {% if participant.age %}
+                <p class="walkin-age">Age: {{ participant.age }}</p>
+                {% endif %}
+                <p class="walkin-meta">
+                    Added: {{ participant.added_at[:19] if participant.added_at else 'N/A' }}
+                    {% if participant.added_by %}
+                    | By: {{ participant.added_by }}
+                    {% endif %}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No walk-in participants registered yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateAgeGroup() {
+    const ageInput = document.getElementById('age');
+    const ageGroupInput = document.getElementById('age_group');
+    const age = parseInt(ageInput.value);
+    
+    if (isNaN(age) || age < 0) {
+        ageGroupInput.value = '';
+        return;
+    }
+    
+    let ageGroup = '';
+    if (age < 5) {
+        ageGroup = 'Group 0: Below 5 yrs';
+    } else if (age >= 5 && age <= 7) {
+        ageGroup = 'Group 1: 5-7 yrs';
+    } else if (age >= 8 && age <= 10) {
+        ageGroup = 'Group 2: 8-10 yrs';
+    } else if (age >= 11 && age <= 14) {
+        ageGroup = 'Group 3: 11-14 yrs';
+    } else if (age >= 15 && age <= 18) {
+        ageGroup = 'Group 4: 15-18 yrs';
+    } else {
+        ageGroup = 'Group 4: 15-18 yrs'; // Default for ages above 18
+    }
+    
+    ageGroupInput.value = ageGroup;
+}
+
+// Auto-update age group when age is entered
+document.addEventListener('DOMContentLoaded', function() {
+    const ageInput = document.getElementById('age');
+    if (ageInput) {
+        ageInput.addEventListener('input', updateAgeGroup);
+        ageInput.addEventListener('change', updateAgeGroup);
+    }
+});
+
+function validateWalkinForm(event) {
+    const ageInput = document.getElementById('age');
+    const ageGroupInput = document.getElementById('age_group');
+    
+    // Ensure age group is set if age is provided
+    if (ageInput.value && !ageGroupInput.value) {
+        updateAgeGroup();
+    }
+    
+    // Validate that age is provided
+    if (!ageInput.value || ageInput.value === '') {
+        alert('Age is required. Please enter the participant\'s age.');
+        ageInput.focus();
+        return false;
+    }
+    
+    const age = parseInt(ageInput.value);
+    if (isNaN(age) || age < 0 || age > 100) {
+        alert('Please enter a valid age between 0 and 100.');
+        ageInput.focus();
+        return false;
+    }
+    
+    // Ensure age group is populated
+    if (!ageGroupInput.value) {
+        updateAgeGroup();
+        if (!ageGroupInput.value) {
+            alert('Unable to determine age group. Please check the age entered.');
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+async function deleteWalkin(name, contestType) {
+    if (!confirm(`Are you sure you want to delete "${name}" from "${contestType}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/delete_walkin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name: name,
+                contest_type: contestType
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert('Participant deleted successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to delete participant'));
+        }
+    } catch (error) {
+        alert('Error deleting participant: ' + error.message);
+    }
+}
+</script>
+{% endblock %}

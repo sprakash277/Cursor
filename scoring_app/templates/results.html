@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Contest Scoring System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Contest Results</h2>
+    <p class="subtitle">All scores and rankings grouped by contest type</p>
+    {% if judge_username %}
+    <p class="subtitle" style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem;">
+        Showing results for your assigned contests only
+    </p>
+    {% endif %}
+    {% if not is_admin_user %}
+    <p class="subtitle" style="font-size: 0.85rem; color: var(--warning-color); margin-top: 0.5rem; font-style: italic;">
+        ⚠️ Participant names are hidden for judges
+    </p>
+    {% endif %}
+</div>
+
+{% if grouped_results %}
+    <!-- Tab Navigation -->
+    <div class="tabs-container">
+        <div class="tabs-nav">
+            {% for contest_type, results in grouped_results.items() %}
+            <button class="tab-button {% if loop.first %}active{% endif %}" 
+                    onclick="openTab(event, 'results-tab-{{ loop.index0 }}')"
+                    data-tab="results-tab-{{ loop.index0 }}">
+                {{ contest_type }}
+                <span class="tab-count">({{ results|length }})</span>
+            </button>
+            {% endfor %}
+        </div>
+
+        <!-- Tab Content -->
+        {% for contest_type, results in grouped_results.items() %}
+        <div id="results-tab-{{ loop.index0 }}" class="tab-content {% if loop.first %}active{% endif %}">
+            <div class="tab-header">
+                <h3>{{ contest_type }}</h3>
+                <p class="tab-subtitle">{{ results|length }} participant{{ 's' if results|length != 1 else '' }}</p>
+            </div>
+            <div class="results-table-container">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Contestant Name</th>
+                            <th>Average Score</th>
+                            <th>Total Score</th>
+                            <th>Number of Judges</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in results %}
+                        <tr>
+                            <td class="rank-cell">
+                                <span class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</span>
+                            </td>
+                            <td>
+                                {% if session.get('is_admin') %}
+                                <strong>{{ result.contestant.name }}</strong>
+                                {% else %}
+                                <strong>Participant {{ result.contestant.participant_id if result.contestant.participant_id else result.contestant.id }}</strong>
+                                {% endif %}
+                                {% if result.contestant.participant_id %}
+                                <br><small style="color: var(--text-secondary);">ID: {{ result.contestant.participant_id }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="score-cell">
+                                <span class="score-value">{{ "%.2f"|format(result.average) }}</span>
+                            </td>
+                            <td>{{ "%.2f"|format(result.total) }}</td>
+                            <td>{{ result.count }}</td>
+                            <td>
+                                <button class="btn btn-small btn-info" onclick="showDetails({{ result.contestant.id }})">
+                                    View Details
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+<!-- Details Modal -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3 id="modalTitle">Score Details</h3>
+        <div id="modalBody"></div>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <p>No results available{% if judge_username %} for your assigned contests{% endif %}.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    
+    // Hide all tab content
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].classList.remove("active");
+    }
+    
+    // Remove active class from all tab buttons
+    tablinks = document.getElementsByClassName("tab-button");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].classList.remove("active");
+    }
+    
+    // Show the selected tab content and mark button as active
+    document.getElementById(tabName).classList.add("active");
+    evt.currentTarget.classList.add("active");
+    
+    // Store active tab in sessionStorage
+    sessionStorage.setItem('activeResultsTab', tabName);
+}
+
+// Restore active tab from sessionStorage on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const activeTab = sessionStorage.getItem('activeResultsTab');
+    if (activeTab) {
+        const tabButton = document.querySelector(`[data-tab="${activeTab}"]`);
+        if (tabButton) {
+            tabButton.click();
+        }
+    }
+});
+
+async function showDetails(contestantId) {
+    try {
+        const response = await fetch(`/api/scores/${contestantId}`);
+        const scores = await response.json();
+        
+        const modal = document.getElementById('detailsModal');
+        const modalBody = document.getElementById('modalBody');
+        
+        if (Object.keys(scores).length === 0) {
+            modalBody.innerHTML = '<p>No scores available for this contestant.</p>';
+        } else {
+            let html = '<div class="score-details">';
+            for (const [judge_key, data] of Object.entries(scores)) {
+                const judgeName = data.judge_name || judge_key;
+                html += `
+                    <div class="score-detail-item">
+                        <h4>${judgeName}</h4>
+                        <p><strong>Score:</strong> ${data.score}</p>
+                        <p><strong>Date:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
+                        ${data.comments ? `<p><strong>Comments:</strong> ${data.comments}</p>` : ''}
+                    </div>
+                `;
+            }
+            html += '</div>';
+            modalBody.innerHTML = html;
+        }
+        
+        modal.style.display = 'block';
+    } catch (error) {
+        alert('Error loading details: ' + error.message);
+    }
+}
+
+function closeModal() {
+    document.getElementById('detailsModal').style.display = 'none';
+}
+
+window.onclick = function(event) {
+    const modal = document.getElementById('detailsModal');
+    if (event.target == modal) {
+        modal.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}
