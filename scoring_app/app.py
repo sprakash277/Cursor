@@ -67,6 +67,52 @@ STANDARD_CONTESTS = [
     "Unknown Contest"  # Fallback for unmapped contests
 ]
 
+# Contest categories for grouping
+def get_contest_category(contest_type):
+    """Group contests into categories for better organization"""
+    if not contest_type:
+        return "Other"
+    
+    contest_lower = str(contest_type).lower()
+    
+    # Quiz category
+    if any(keyword in contest_lower for keyword in ['quiz', 'iq', 'sudoku', 'math']):
+        return "Quiz & Puzzles"
+    
+    # Singing category
+    if any(keyword in contest_lower for keyword in ['singing', 'song']):
+        return "Singing"
+    
+    # Dance category
+    if any(keyword in contest_lower for keyword in ['dance', 'folk dance']):
+        return "Dance"
+    
+    # Speech category
+    if any(keyword in contest_lower for keyword in ['speech', 'presentation', 'impromptu']):
+        return "Speech & Presentation"
+    
+    # Art category
+    if any(keyword in contest_lower for keyword in ['coloring', 'drawing', 'chalk art', 'rangoli']):
+        return "Art & Creative"
+    
+    # Games category
+    if any(keyword in contest_lower for keyword in ['chess', 'carrom']):
+        return "Games"
+    
+    # Instrument category
+    if 'instrument' in contest_lower:
+        return "Instrument"
+    
+    # Special categories
+    if 'fancy dress' in contest_lower:
+        return "Special Events"
+    
+    if 'yoga' in contest_lower:
+        return "Fitness & Wellness"
+    
+    # Default
+    return "Other"
+
 # Mapping from Excel order items to standardized contest names
 def map_order_item_to_contest(order_item):
     """Map order item text to standardized contest name"""

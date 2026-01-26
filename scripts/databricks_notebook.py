@@ -196,8 +196,9 @@ else:
 import subprocess
 import os
 import glob
+import shlex
 
-def run_digen_python(work_dir, output_dir, scale_factor=10, java_home="/usr/lib/jvm/java-8-openjdk-amd64"):
+def run_digen_python(work_dir, output_dir, scale_factor=10, java_home="/usr/lib/jvm/java-8-openjdk-amd64", use_jar=False):
     """
     Run DIGen using Python subprocess
     
@@ -206,86 +207,82 @@ def run_digen_python(work_dir, output_dir, scale_factor=10, java_home="/usr/lib/
         output_dir: Output directory for generated files
         scale_factor: TPC-DI scale factor (default: 10)
         java_home: Java home directory (default: Java 8)
+        use_jar: If True, use -jar flag (requires dependencies in classpath).
+                 If False, use -cp with explicit main class (recommended for external dependencies)
     
     Returns:
         tuple: (exit_code, output_files_list)
     """
+    import shlex
+    
     # Set environment variables
     env = os.environ.copy()
     env['PDG_AGREE'] = 'YES'
     env['JAVA_HOME'] = java_home
     env['PATH'] = f"{java_home}/bin:{env.get('PATH', '')}"
     
-    # Build classpath
-    digen_jar = f"{work_dir}/Tools/DIGen.jar"
-    commons_cli = f"{work_dir}/Tools/lib/commons-cli-1.4.jar"
-    classpath = f"{digen_jar}:{commons_cli}"
+    # Build command based on method
+    digen_path = f"{work_dir}/Tools/"
+    digen_jar = f"{digen_path}DIGen.jar"
     
-    # Main class
-    main_class = "org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
+    if use_jar:
+        # Simple -jar approach (works if dependencies are already in classpath)
+        cmd = f"java -Xmx8g -jar {digen_jar} -sf {scale_factor} -o {output_dir}/"
+    else:
+        # -cp approach with explicit main class (recommended for external dependencies)
+        commons_cli = f"{digen_path}lib/commons-cli-1.4.jar"
+        classpath = f"{digen_jar}:{commons_cli}"
+        main_class = "org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"
+        cmd = f"java -Xmx8g -cp {classpath} {main_class} -sf {scale_factor} -o {output_dir}/"
     
-    # Java command
-    java_cmd = [
-        f"{java_home}/bin/java",
-        "-Xmx8g",
-        "-cp", classpath,
-        main_class,
-        "-o", f"{output_dir}/",
-        "-sf", str(scale_factor)
-    ]
+    # Parse command into args
+    args = shlex.split(cmd)
     
     print("=" * 50)
     print("Running TPC-DI DIGen from Python")
     print("=" * 50)
     print(f"Scale Factor: {scale_factor}")
     print(f"Output Directory: {output_dir}")
-    print(f"Classpath: {classpath}")
-    print(f"Main Class: {main_class}")
+    print(f"Command: {cmd}")
     print(f"PDG_AGREE: {env.get('PDG_AGREE')}")
     print("=" * 50)
     print()
-    print("Starting data generation (this may take a while)...")
+    print(f"Generating data and outputting to {output_dir}")
     print()
     
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
     
     # Clean up lock files
-    lock_file = f"{work_dir}/Tools/.pdgf.lock"
+    lock_file = f"{digen_path}.pdgf.lock"
     if os.path.exists(lock_file):
         print(f"Removing existing lock file: {lock_file}")
         os.remove(lock_file)
     
-    # Change to Tools directory
-    tools_dir = f"{work_dir}/Tools"
-    original_dir = os.getcwd()
-    
     # Create a log file for output to avoid pipe issues
     log_file = f"{output_dir}/digen.log"
-    os.makedirs(output_dir, exist_ok=True)
     
     try:
-        os.chdir(tools_dir)
-        
-        print("Running DIGen (output will be logged and displayed)...")
-        print(f"Log file: {log_file}")
+        # Run DIGen using Popen with pipes, but write to log file to avoid broken pipe errors
+        print("Starting data generation (this may take a while)...")
+        print(f"Logging output to: {log_file}")
         print()
         
-        # Run DIGen with stdin redirected to /dev/null and output to log file
-        # This prevents DIGen from reading commands from stdin and avoids broken pipe errors
         with open(os.devnull, 'r') as devnull, open(log_file, 'w', buffering=1) as log:
-            # Use subprocess.run for simpler error handling
-            result = subprocess.run(
-                java_cmd,
+            # Use Popen as requested, but redirect output to log file to avoid broken pipes
+            process = subprocess.Popen(
+                args,
+                cwd=digen_path,
                 env=env,
-                stdin=devnull,  # Redirect stdin to /dev/null
-                stdout=log,     # Write to log file
-                stderr=subprocess.STDOUT,  # Combine stderr with stdout
-                cwd=tools_dir,
-                text=True
+                universal_newlines=True,
+                stdin=devnull,  # Redirect stdin to /dev/null to prevent interactive mode
+                stdout=log,     # Write to log file instead of PIPE to avoid broken pipe
+                stderr=subprocess.STDOUT  # Combine stderr with stdout
             )
-            exit_code = result.returncode
             
+            # Wait for process to complete
+            exit_code = process.wait()
+        
         # Read and display log file (filtering out null command errors)
         if os.path.exists(log_file):
             print("DIGen output:")
@@ -296,23 +293,18 @@ def run_digen_python(work_dir, output_dir, scale_factor=10, java_home="/usr/lib/
                     if "Command 'null' is unknown" not in line:
                         if "Flooding prevention" not in line:
                             print(line, end='')
-                        else:
-                            # Show flooding prevention but note it's usually harmless
-                            print("(Note: Flooding prevention triggered - usually harmless if data is generated)")
+                        elif "generating" in line or "finished" in line:
+                            # Show important progress messages
+                            print(line, end='')
             print("-" * 50)
         else:
             print("Warning: Log file not created")
             
-    except subprocess.TimeoutExpired:
-        print("ERROR: DIGen process timed out")
-        exit_code = 1
     except Exception as e:
         print(f"Error running DIGen: {str(e)}")
         import traceback
         traceback.print_exc()
         exit_code = 1
-    finally:
-        os.chdir(original_dir)
     
     # Check if files were generated (even if exit code is non-zero)
     output_files = []
@@ -353,11 +345,14 @@ else:
 JAVA_HOME = "/usr/lib/jvm/java-8-openjdk-amd64"
 
 # Run DIGen
+# Set use_jar=True if you want to use -jar flag (requires dependencies in classpath)
+# Set use_jar=False (default) to use -cp with explicit main class (recommended)
 exit_code, output_files = run_digen_python(
     work_dir=work_dir,
     output_dir=output_dir,
     scale_factor=SCALE_FACTOR,
-    java_home=JAVA_HOME
+    java_home=JAVA_HOME,
+    use_jar=False  # Set to True to use -jar flag instead of -cp
 )
 
 # Check results

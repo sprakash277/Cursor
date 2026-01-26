@@ -417,6 +417,121 @@ main {
     -webkit-overflow-scrolling: touch;
 }
 
+/* Category Tabs (Top Level) - Styled differently */
+.category-tab {
+    font-weight: 700;
+    font-size: 1rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border: 2px solid transparent;
+}
+
+.category-tab:hover {
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.category-tab.active {
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+    box-shadow: var(--shadow-lg);
+}
+
+.category-tab .tab-count {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Category Header */
+.category-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid var(--primary-color);
+}
+
+.category-title {
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+}
+
+.category-subtitle {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+/* Contest Tabs Container (Within Category) */
+.contest-tabs-container {
+    margin-top: 1.5rem;
+}
+
+.contest-tabs-nav {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #f1f5f9;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.contest-tab-button {
+    background: white;
+    border: 2px solid var(--border-color);
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.contest-tab-button:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.contest-tab-button.active {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+}
+
+.contest-tab-content {
+    display: none;
+    padding: 1.5rem 0;
+    animation: fadeIn 0.3s ease;
+}
+
+.contest-tab-content.active {
+    display: block;
+}
+
+.category-tab-content {
+    display: none;
+    padding: 2rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.category-tab-content.active {
+    display: block;
+}
+
 .tab-button {
     background: white;
     border: 2px solid var(--border-color);
@@ -2038,6 +2153,56 @@ footer {
     
     .tab-button {
         padding: 0.6rem 0.85rem;
+        font-size: 0.8rem;
+    }
+    
+    .category-tab {
+        font-size: 0.85rem;
+        padding: 0.5rem 0.85rem;
+    }
+    
+    .category-title {
+        font-size: 1.25rem;
+    }
+    
+    .category-subtitle {
+        font-size: 0.85rem;
+    }
+    
+    .contest-tabs-nav {
+        padding: 0.4rem;
+        gap: 0.3rem;
+    }
+    
+    .contest-tab-button {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+        min-height: 38px;
+    }
+    
+    .category-tab-content {
+        padding: 1rem 0.75rem;
+    }
+    
+    .contest-tab-content {
+        padding: 0.75rem 0;
+    }
+    
+    .category-tab {
+        font-size: 0.85rem;
+        padding: 0.5rem 0.85rem;
+    }
+    
+    .category-title {
+        font-size: 1.25rem;
+    }
+    
+    .category-subtitle {
+        font-size: 0.85rem;
+    }
+    
+    .contest-tab-button {
+        padding: 0.5rem 0.75rem;
         font-size: 0.8rem;
     }
     
