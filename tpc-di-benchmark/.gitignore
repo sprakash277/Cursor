@@ -1,0 +1,46 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# Results
+benchmark_results.json
+benchmark_results.csv
+*.log
+
+# TPC-DI Data and Tools
+tpcdi_data/
+Tools/
+TPCDI_Tools.zip
+*.txt
+pdgf/
+PDGF/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Databricks
+.databricks/
+
+# GCP
+*.json
+!config.json
+service-account-key.json

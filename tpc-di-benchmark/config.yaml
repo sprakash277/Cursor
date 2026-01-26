@@ -1,0 +1,46 @@
+# TPC-DI Benchmark Configuration
+
+# Scale factor for data generation (1 = ~1GB, 10 = ~10GB, etc.)
+scale_factor: 1
+
+# Data generation settings
+data_generation:
+  # Use official DIGen tool (recommended) or custom Spark generator
+  use_digen: true  # Set to false to use custom Spark-based generator
+  digen_path: "./Tools/DIGen.jar"  # Path to DIGen.jar
+  java_path: "java"  # Path to Java executable
+  output_path: "/tmp/tpcdi_data"
+  format: "parquet"  # parquet, delta, csv
+  
+# Databricks configuration
+databricks:
+  workspace_url: "${DATABRICKS_WORKSPACE_URL}"
+  token: "${DATABRICKS_TOKEN}"
+  cluster_id: "${DATABRICKS_CLUSTER_ID}"
+  catalog: "hive_metastore"
+  schema: "tpcdi"
+  storage_path: "dbfs:/tmp/tpcdi"
+  
+# Dataproc configuration
+dataproc:
+  project_id: "${GCP_PROJECT_ID}"
+  region: "us-central1"
+  cluster_name: "tpcdi-benchmark"
+  bucket_name: "${GCS_BUCKET_NAME}"
+  zone: "us-central1-a"
+  
+# Benchmark queries
+benchmark:
+  queries:
+    - name: "q1"
+      description: "Query 1 description"
+      sql_file: "queries/q1.sql"
+    - name: "q2"
+      description: "Query 2 description"
+      sql_file: "queries/q2.sql"
+  
+  metrics:
+    - execution_time
+    - data_scanned
+    - cost
+    - throughput
