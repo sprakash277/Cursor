@@ -48,15 +48,30 @@ java -Xmx8g -cp "..." ... < /dev/null  # Missing 2>&1 may hide errors
 4. Kill any stuck processes: `pkill -f DIGen.jar`
 5. Clean output directory if needed: `rm -rf output/*`
 
-### Error: "Illegal try to restart a died worker thread"
+### Error: "Illegal try to restart a died worker thread" or "Broken pipe"
 
-**Problem:** This usually occurs after the previous errors cause DIGen to crash.
+**Problem:** This occurs when DIGen crashes due to I/O issues, often related to:
+- Broken pipe errors when writing to stdout/stderr
+- File handle issues in Python subprocess
+- DIGen's internal buffering conflicts with file redirection
 
 **Solution:**
-1. Clean up lock files and processes (see above)
-2. Ensure `PDG_AGREE=YES` is set correctly
-3. Restart from a clean state
-4. Check Java heap size - may need to increase: `-Xmx8g` or higher
+1. **Use Shell Command Instead:** If using Python subprocess, try the shell command method (`%sh` cell) instead
+2. **Clean up lock files and processes:**
+   ```bash
+   rm -f Tools/.pdgf.lock
+   pkill -f DIGen.jar
+   ```
+3. **Ensure `PDG_AGREE=YES` is set correctly**
+4. **Restart from a clean state**
+5. **Check Java heap size** - may need to increase: `-Xmx8g` or higher
+6. **Use direct file output:** If using Python, ensure log file handles stay open for entire process duration
+
+**Alternative:** Run DIGen using shell command (`%sh` cell) which avoids Python subprocess pipe issues:
+```bash
+export PDG_AGREE=YES
+java -Xmx8g -cp "DIGen.jar:lib/commons-cli-1.4.jar" org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader -o /output/ -sf 1 2>&1 < /dev/null
+```
 
 ### Error: "NoClassDefFoundError: org/apache/commons/cli/Options"
 

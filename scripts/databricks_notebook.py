@@ -263,25 +263,27 @@ def run_digen_python(work_dir, output_dir, scale_factor=10, java_home="/usr/lib/
     log_file = f"{output_dir}/digen.log"
     
     try:
-        # Run DIGen using Popen with pipes, but write to log file to avoid broken pipe errors
+        # Run DIGen using shell=True to let shell handle redirection (more reliable)
         print("Starting data generation (this may take a while)...")
         print(f"Logging output to: {log_file}")
         print()
         
-        with open(os.devnull, 'r') as devnull, open(log_file, 'w', buffering=1) as log:
-            # Use Popen as requested, but redirect output to log file to avoid broken pipes
-            process = subprocess.Popen(
-                args,
-                cwd=digen_path,
-                env=env,
-                universal_newlines=True,
-                stdin=devnull,  # Redirect stdin to /dev/null to prevent interactive mode
-                stdout=log,     # Write to log file instead of PIPE to avoid broken pipe
-                stderr=subprocess.STDOUT  # Combine stderr with stdout
-            )
-            
-            # Wait for process to complete
-            exit_code = process.wait()
+        # Reconstruct command as string for shell execution
+        # This lets the shell handle redirection more reliably
+        cmd_str = ' '.join(shlex.quote(arg) for arg in args)
+        shell_cmd = f"cd {shlex.quote(digen_path)} && {cmd_str} < /dev/null > {shlex.quote(log_file)} 2>&1"
+        
+        # Use shell=True to let shell handle redirection (avoids broken pipe issues)
+        process = subprocess.Popen(
+            shell_cmd,
+            shell=True,
+            cwd=digen_path,
+            env=env,
+            universal_newlines=True
+        )
+        
+        # Wait for process to complete
+        exit_code = process.wait()
         
         # Read and display log file (filtering out null command errors)
         if os.path.exists(log_file):
@@ -325,6 +327,8 @@ def run_digen_python(work_dir, output_dir, scale_factor=10, java_home="/usr/lib/
 # MAGIC ### Option A: Run DIGen using Python (Recommended)
 # MAGIC 
 # MAGIC Use this if you want to run DIGen from a Python cell with better error handling and output streaming.
+# MAGIC 
+# MAGIC **Note:** If you encounter "Broken pipe" errors, try Option B (Shell Command) instead, as DIGen may have issues with Python subprocess file redirection.
 
 # COMMAND ----------
 
