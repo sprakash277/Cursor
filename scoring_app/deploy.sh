@@ -88,17 +88,27 @@ SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
 HOST=0.0.0.0
 PORT=5000
 
-# File Paths (update these as needed)
+# File Paths - All data files are stored in the data/ folder
+# Excel file should be placed at: data/sanskriti-3.xlsx
 EXCEL_FILE_PATH=$APP_DIR/data/sanskriti-3.xlsx
 UPLOAD_FOLDER=$APP_DIR/uploads
 DATA_FOLDER=$APP_DIR/data
 EOF
-    echo -e "${GREEN}.env file created. Please update EXCEL_FILE_PATH if needed.${NC}"
+    echo -e "${GREEN}.env file created with data folder paths.${NC}"
+    echo -e "${YELLOW}Note: Make sure to copy sanskriti-3.xlsx to the data/ folder${NC}"
 fi
 
-# Create data directory structure
+# Create data directory structure (if not exists)
 mkdir -p data
 mkdir -p uploads
+
+# Check if Excel file exists in data folder
+if [ ! -f "data/sanskriti-3.xlsx" ]; then
+    echo -e "${YELLOW}Warning: sanskriti-3.xlsx not found in data/ folder${NC}"
+    echo -e "${YELLOW}Please copy your Excel file to: $APP_DIR/data/sanskriti-3.xlsx${NC}"
+else
+    echo -e "${GREEN}✓ Excel file found in data/ folder${NC}"
+fi
 
 # Set permissions
 chmod +x run.sh
@@ -109,8 +119,11 @@ echo "Deployment completed successfully!"
 echo "==========================================${NC}"
 echo ""
 echo "Next steps:"
-echo "1. Update .env file with your configuration"
-echo "2. Place your Excel file in the data/ directory"
+echo "1. Copy your Excel file to the data/ directory:"
+echo "   scp sanskriti-3.xlsx username@vm-ip:~/scoring_app/data/"
+echo "2. Verify .env file has correct paths (already configured for data/ folder)"
 echo "3. Run: ./start.sh (or use systemd service)"
 echo "4. Access the app at http://your-vm-ip:5000"
+echo ""
+echo "Note: All data files (JSON, Excel) are stored in the data/ folder"
 echo ""

@@ -36,7 +36,9 @@ Thumbs.db
 
 # Data files
 data/*.json
-data/*.xlsx
+# Note: sanskriti-3.xlsx should be in data/ folder but not committed to git
+# Uncomment the line below if you want to ignore the Excel file
+# data/*.xlsx
 uploads/*
 
 # Logs

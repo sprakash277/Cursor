@@ -31,6 +31,13 @@ fi
 mkdir -p uploads
 mkdir -p data
 
+# Verify Excel file exists in data folder
+if [ ! -f "data/sanskriti-3.xlsx" ]; then
+    echo "Warning: sanskriti-3.xlsx not found in data/ folder"
+    echo "Please ensure the Excel file is at: data/sanskriti-3.xlsx"
+    echo ""
+fi
+
 # Start the application
 echo "Starting Flask application..."
 echo "Host: $HOST"

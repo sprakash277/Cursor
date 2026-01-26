@@ -15,17 +15,23 @@ chmod +x deploy.sh
 ./deploy.sh
 ```
 
-### 3. Update Configuration
-Edit `.env` file and update the Excel file path:
-```bash
-nano .env
-```
-
-### 4. Upload Your Excel File
+### 3. Upload Your Excel File to data/ folder
 ```bash
 # From your local machine
 scp sanskriti-3.xlsx username@vm-ip:~/scoring_app/data/
 ```
+
+The Excel file must be placed at: `~/scoring_app/data/sanskriti-3.xlsx`
+
+### 4. Verify Configuration (Optional)
+The `.env` file is already configured to use the data/ folder. You can verify:
+```bash
+cat .env | grep -E "EXCEL_FILE_PATH|DATA_FOLDER"
+```
+
+Should show:
+- `EXCEL_FILE_PATH=/home/username/scoring_app/data/sanskriti-3.xlsx`
+- `DATA_FOLDER=/home/username/scoring_app/data`
 
 ### 5. Start the Application
 
