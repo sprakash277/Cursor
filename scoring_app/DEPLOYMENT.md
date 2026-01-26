@@ -77,45 +77,324 @@ DATA_FOLDER=/home/username/scoring_app/data
 
 ## Step 3: Start the Application
 
-### Option A: Manual Start (for testing)
+You have two options to start the application:
+
+### Option A: Manual Start with start.sh (Recommended for Testing/Development)
+
+This method runs the application directly in your terminal. It's useful for:
+- Testing the application
+- Development and debugging
+- Quick startup without systemd
+- Seeing real-time output in the terminal
+
+#### How to Use:
+
+1. **Make the script executable** (if not already):
 ```bash
 chmod +x start.sh
+```
+
+2. **Start the application**:
+```bash
 ./start.sh
 ```
 
-The application will be available at: `http://your-vm-ip:5000`
+#### What start.sh Does:
 
-### Option B: Systemd Service (Recommended for production)
+- Activates the Python virtual environment
+- Loads environment variables from `.env` file
+- Creates necessary directories (`data/`, `uploads/`)
+- Checks if the Excel file exists in `data/` folder
+- Starts the Flask application using Gunicorn (production server)
+- Runs on the host and port specified in `.env` (default: `0.0.0.0:5000`)
 
-1. Install the systemd service:
+#### Expected Output:
+
+```
+Starting Flask application...
+Host: 0.0.0.0
+Port: 5000
+Environment: production
+
+Starting with Gunicorn...
+[INFO] Starting gunicorn 20.1.0
+[INFO] Listening at: http://0.0.0.0:5000
+[INFO] Using worker: sync
+[INFO] Booting worker with pid: 12345
+```
+
+#### To Stop:
+
+Press `Ctrl+C` in the terminal where it's running.
+
+#### Access the Application:
+
+Open your browser and go to: `http://your-vm-ip:5000`
+
+#### Troubleshooting:
+
+- **Port already in use**: Another process might be using port 5000
+  ```bash
+  sudo lsof -i :5000
+  sudo kill -9 <PID>
+  ```
+
+- **Permission denied**: Make sure the script is executable
+  ```bash
+  chmod +x start.sh
+  ```
+
+- **Virtual environment not found**: Run `./deploy.sh` first
+  ```bash
+  ./deploy.sh
+  ```
+
+- **Excel file not found**: Make sure `sanskriti-3.xlsx` is in `data/` folder
+  ```bash
+  ls -lh data/sanskriti-3.xlsx
+  ```
+
+---
+
+### Option B: Systemd Service (Recommended for Production)
+
+This method runs the application as a background service. It's useful for:
+- Production deployments
+- Automatic startup on server reboot
+- Running in the background
+- Better process management
+- Automatic restart on failure
+
+#### How to Use:
+
+1. **Install the systemd service**:
 ```bash
 chmod +x install-service.sh
 ./install-service.sh
 ```
 
-2. Start the service:
+This script will:
+- Create a systemd service file at `/etc/systemd/system/scoring-app.service`
+- Configure the service to run as your user
+- Set up logging to `~/scoring_app/logs/`
+- Enable auto-restart on failure
+- Reload systemd daemon
+
+#### Expected Output:
+
+```
+Installing systemd service...
+Copying service file to /etc/systemd/system/...
+Reloading systemd...
+Enabling service...
+Service installed successfully!
+
+To start the service:
+  sudo systemctl start scoring-app
+
+To stop the service:
+  sudo systemctl stop scoring-app
+
+To check status:
+  sudo systemctl status scoring-app
+
+To view logs:
+  sudo journalctl -u scoring-app -f
+```
+
+2. **Start the service**:
 ```bash
 sudo systemctl start scoring-app
 ```
 
-3. Enable auto-start on boot:
+3. **Enable auto-start on boot** (so it starts automatically when VM reboots):
 ```bash
 sudo systemctl enable scoring-app
 ```
 
-4. Check service status:
+4. **Check service status**:
 ```bash
 sudo systemctl status scoring-app
 ```
 
-5. View logs:
-```bash
-# Real-time logs
-sudo journalctl -u scoring-app -f
+#### Expected Status Output:
 
-# Last 100 lines
+```
+● scoring-app.service - Contest Scoring System Flask Application
+   Loaded: loaded (/etc/systemd/system/scoring-app.service; enabled; vendor preset: enabled)
+   Active: active (running) since Mon 2026-01-26 12:00:00 UTC; 5s ago
+ Main PID: 12345 (gunicorn)
+    Tasks: 5 (limit: 4915)
+   Memory: 150.0M
+   CGroup: /system.slice/scoring-app.service
+           ├─12345 /home/username/scoring_app/venv/bin/gunicorn -w 4 -b 0.0.0.0:5000...
+           ├─12346 /home/username/scoring_app/venv/bin/gunicorn -w 4 -b 0.0.0.0:5000...
+           └─12347 /home/username/scoring_app/venv/bin/gunicorn -w 4 -b 0.0.0.0:5000...
+```
+
+#### Service Management Commands:
+
+**Start the service:**
+```bash
+sudo systemctl start scoring-app
+```
+
+**Stop the service:**
+```bash
+sudo systemctl stop scoring-app
+```
+
+**Restart the service** (useful after code updates):
+```bash
+sudo systemctl restart scoring-app
+```
+
+**Reload the service** (without stopping, if supported):
+```bash
+sudo systemctl reload scoring-app
+```
+
+**Check if service is running:**
+```bash
+sudo systemctl is-active scoring-app
+# Output: active
+```
+
+**Check if service is enabled (auto-start on boot):**
+```bash
+sudo systemctl is-enabled scoring-app
+# Output: enabled
+```
+
+**Disable auto-start on boot:**
+```bash
+sudo systemctl disable scoring-app
+```
+
+**View real-time logs:**
+```bash
+sudo journalctl -u scoring-app -f
+```
+
+**View last 100 lines of logs:**
+```bash
 sudo journalctl -u scoring-app -n 100
 ```
+
+**View logs since today:**
+```bash
+sudo journalctl -u scoring-app --since today
+```
+
+**View logs with timestamps:**
+```bash
+sudo journalctl -u scoring-app -f --no-pager
+```
+
+**View application logs** (if configured):
+```bash
+tail -f ~/scoring_app/logs/access.log
+tail -f ~/scoring_app/logs/error.log
+```
+
+#### Troubleshooting Systemd Service:
+
+**Service won't start:**
+```bash
+# Check status for error messages
+sudo systemctl status scoring-app
+
+# Check logs for errors
+sudo journalctl -u scoring-app -n 50
+
+# Verify service file
+sudo systemctl cat scoring-app
+
+# Check if paths are correct
+cat /etc/systemd/system/scoring-app.service
+```
+
+**Service starts but immediately stops:**
+```bash
+# Check detailed logs
+sudo journalctl -u scoring-app -n 100 --no-pager
+
+# Verify Excel file exists
+ls -lh ~/scoring_app/data/sanskriti-3.xlsx
+
+# Check virtual environment
+ls -la ~/scoring_app/venv/bin/python
+
+# Test manual start to see errors
+cd ~/scoring_app
+source venv/bin/activate
+python app.py
+```
+
+**Permission errors:**
+```bash
+# Fix ownership
+sudo chown -R $USER:$USER ~/scoring_app
+
+# Fix permissions
+chmod +x ~/scoring_app/*.sh
+chmod 644 ~/scoring_app/.env
+```
+
+**Port already in use:**
+```bash
+# Find process using port 5000
+sudo lsof -i :5000
+
+# Kill the process
+sudo kill -9 <PID>
+
+# Or change port in .env file
+nano ~/scoring_app/.env
+# Change PORT=5000 to PORT=5001
+sudo systemctl restart scoring-app
+```
+
+#### Service Configuration Details:
+
+The service file (`scoring-app.service`) is configured with:
+- **Type**: `simple` - Service runs in foreground
+- **User**: Your username (automatically set)
+- **Working Directory**: `~/scoring_app`
+- **Environment**: Loads from `~/scoring_app/.env`
+- **ExecStart**: Runs Gunicorn with 4 workers
+- **Restart**: `always` - Automatically restarts on failure
+- **RestartSec**: `10` - Waits 10 seconds before restart
+- **Logs**: Stored in `~/scoring_app/logs/` and systemd journal
+
+#### After Code Updates:
+
+When you pull new code from GitHub:
+```bash
+cd ~/scoring_app
+git pull origin main
+source venv/bin/activate
+pip install -r requirements.txt  # If requirements changed
+sudo systemctl restart scoring-app
+```
+
+#### Access the Application:
+
+Once the service is running, access at: `http://your-vm-ip:5000`
+
+---
+
+## Comparison: start.sh vs Systemd Service
+
+| Feature | start.sh | Systemd Service |
+|---------|----------|-----------------|
+| **Use Case** | Testing, Development | Production |
+| **Runs in Background** | No (runs in terminal) | Yes |
+| **Auto-start on Boot** | No | Yes (if enabled) |
+| **Auto-restart on Failure** | No | Yes |
+| **Process Management** | Manual (Ctrl+C) | Systemd manages |
+| **Logs** | Terminal output | Systemd journal + log files |
+| **Best For** | Quick testing, debugging | Production deployment |
 
 ## Step 4: Configure Firewall
 

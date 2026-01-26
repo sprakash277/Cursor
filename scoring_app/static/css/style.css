@@ -154,10 +154,25 @@ main {
         font-size: 0.75rem;
     }
     
+    /* Navbar container adjustments for mobile */
+    .navbar .container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
     .nav-links {
         flex-wrap: wrap;
-        gap: 1rem;
-        font-size: 0.9rem;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        overflow-x: visible;
+        justify-content: center;
+        width: 100%;
+        margin-top: 0.75rem;
+    }
+    
+    .nav-links li {
+        flex-shrink: 1;
+        min-width: auto;
     }
 }
 
@@ -176,6 +191,21 @@ main {
     z-index: 1001;
 }
 
+/* Mobile: Allow tabs to wrap to new rows instead of scrolling */
+@media (max-width: 768px) {
+    .nav-links {
+        flex-wrap: wrap;
+        overflow-x: visible;
+        justify-content: center;
+        width: 100%;
+    }
+    
+    .nav-links li {
+        flex-shrink: 1;
+        min-width: auto;
+    }
+}
+
 .nav-links::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
 }
@@ -183,6 +213,13 @@ main {
 .nav-links li {
     flex-shrink: 0;
     white-space: nowrap;
+}
+
+/* On mobile, allow list items to shrink and wrap */
+@media (max-width: 768px) {
+    .nav-links li {
+        flex-shrink: 1;
+    }
 }
 
 .nav-links a {
@@ -1688,15 +1725,24 @@ footer {
     /* Navigation improvements */
     .navbar .container {
         flex-wrap: wrap;
+        flex-direction: column;
+        align-items: stretch;
     }
     
     .nav-links {
-        gap: 0.3rem;
+        gap: 0.5rem;
         font-size: 0.85rem;
         padding: 0.5rem 0;
         width: 100%;
-        margin-top: 0.5rem;
-        justify-content: flex-start;
+        margin-top: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap; /* Allow tabs to wrap to new rows */
+        overflow-x: visible; /* No horizontal scrolling */
+    }
+    
+    .nav-links li {
+        flex-shrink: 1;
+        min-width: auto;
     }
     
     .nav-links a {
@@ -1705,6 +1751,7 @@ footer {
         min-height: 44px; /* Touch-friendly */
         display: flex;
         align-items: center;
+        white-space: nowrap; /* Keep text in tabs from wrapping */
     }
     
     .judge-name {
@@ -1958,12 +2005,20 @@ footer {
     
     .nav-links {
         font-size: 0.8rem;
-        gap: 0.25rem;
+        gap: 0.4rem;
+        flex-wrap: wrap; /* Ensure wrapping on small phones */
+        overflow-x: visible; /* No scrolling */
+        justify-content: center;
+    }
+    
+    .nav-links li {
+        flex-shrink: 1;
     }
     
     .nav-links a {
         padding: 0.5rem 0.75rem;
         font-size: 0.8rem;
+        white-space: nowrap;
     }
     
     .tab-button {

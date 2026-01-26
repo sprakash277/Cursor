@@ -35,17 +35,78 @@ Should show:
 
 ### 5. Start the Application
 
-**Option A: Manual Start (Testing)**
+#### Option A: Manual Start with start.sh (Testing/Development)
+
+**Quick Start:**
 ```bash
 ./start.sh
 ```
 
-**Option B: Systemd Service (Production)**
+**What it does:**
+- Starts the app in your terminal
+- Uses Gunicorn production server
+- Shows real-time output
+- Press `Ctrl+C` to stop
+
+**When to use:**
+- Testing the application
+- Development and debugging
+- Quick startup
+
+**Access:** `http://your-vm-ip:5000`
+
+---
+
+#### Option B: Systemd Service (Production - Recommended)
+
+**Install and Start:**
 ```bash
+# 1. Install the service
 ./install-service.sh
+
+# 2. Start the service
 sudo systemctl start scoring-app
+
+# 3. Enable auto-start on boot
 sudo systemctl enable scoring-app
+
+# 4. Check status
+sudo systemctl status scoring-app
 ```
+
+**What it does:**
+- Runs as background service
+- Auto-starts on server reboot
+- Auto-restarts on failure
+- Better for production use
+
+**Service Management:**
+```bash
+# Start
+sudo systemctl start scoring-app
+
+# Stop
+sudo systemctl stop scoring-app
+
+# Restart (after code updates)
+sudo systemctl restart scoring-app
+
+# View logs
+sudo journalctl -u scoring-app -f
+
+# Check status
+sudo systemctl status scoring-app
+```
+
+**When to use:**
+- Production deployment
+- Need background service
+- Want auto-restart on failure
+- Need auto-start on boot
+
+**Access:** `http://your-vm-ip:5000`
+
+**For detailed instructions, see [DEPLOYMENT.md](DEPLOYMENT.md) - Step 3**
 
 ### 6. Access the Application
 Open browser: `http://your-vm-ip:5000`
