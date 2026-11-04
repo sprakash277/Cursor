@@ -1,0 +1,57 @@
+Job Description: Release Engineer (Azure & GitHub)
+Department: Platform & DevOps Engineering
+
+Employment Type: Full-Time
+
+Location: Remote / Hybrid / On-site
+
+Level: Mid to Senior
+
+Role Overview
+We are looking for a Release Engineer to lead, automate, and modernize our software delivery pipelines across cloud and server architectures. In this role, you will bridge the gap between engineering and IT operations, designing resilient CI/CD pipelines with GitHub Enterprise and automating zero-downtime deployments to Microsoft Azure and on-premises/hybrid server infrastructure. You will be responsible for release safety, environment integrity, automated rollback capabilities, and software supply chain governance.
+
+Key Responsibilities
+Pipeline & Workflow Architecture: Design, build, and maintain enterprise CI/CD pipelines using GitHub Actions (composite actions, reusable workflows, and matrix builds) to support microservices, APIs, and backend server workloads.
+
+Azure Cloud Deployment: Deploy, manage, and scale server-side applications targeting Azure services (AKS, Azure App Services, Container Apps, Virtual Machines, and Azure Functions).
+
+Infrastructure as Code (IaC): Standardize environment provisioning and continuous delivery using Terraform, Bicep, or ARM templates integrated directly into GitHub workflows.
+
+Release Management & Orchestration: Implement advanced release patterns including Blue/Green, Canary rollouts, feature flags, and automated rollback workflows to ensure zero customer-facing downtime.
+
+Artifact & Package Management: Manage binary lifecycle, build artifacts, container images, and versioning strategies using GitHub Packages, Azure Container Registry (ACR), and semantic versioning (SemVer).
+
+Security & Compliance (DevSecOps): Integrate security scanning directly into PR pipelines, including SAST, DAST, dependency review (Dependabot), container scanning, and Azure Key Vault / GitHub Secrets management using OpenID Connect (OIDC) federated credentials.
+
+Server & Hybrid Host Management: Configure, maintain, and secure self-hosted GitHub Actions runners operating across Azure virtual networks and on-premises server environments.
+
+Triage & Production Support: Partner with SRE and QA during scheduled release windows, lead deployment triage, quickly isolate deployment breakages, and lead blameless post-mortems for release failures.
+
+Qualifications & Requirements
+Must-Have
+Experience: 3–6+ years of dedicated experience in Release Engineering, DevOps, or Build & Deployment Engineering.
+
+GitHub Ecosystem: Expert knowledge of Git, branching models (Trunk-Based, GitFlow), GitHub Actions (YAML), GitHub Enterprise administration, branch protection rules, and Environments/Deployment gates.
+
+Microsoft Azure: Strong practical experience deploying and configuring core Azure workloads (Azure Kubernetes Service, App Services, VMs, Azure networking, Key Vault, and Entra ID/RBAC).
+
+IaC & Automation: Demonstrated proficiency with Terraform or Azure Bicep for cloud provisioning.
+
+Containerization: Production experience building and orchestrating containers using Docker and Kubernetes.
+
+Scripting Skills: Proficiency with Bash, PowerShell, or Python for build scripts and deployment automation.
+
+Release Security: Hands-on experience configuring passwordless authentication between GitHub Actions and Azure via OIDC and Azure Managed Identities.
+
+Preferred / Nice-to-Have
+Experience managing and securing GitHub Enterprise Server (GHES) or self-hosted runner clusters (e.g., Actions Runner Controller on Kubernetes).
+
+Knowledge of progressive delivery tooling (ArgoCD, Flux, or LaunchDarkly).
+
+Relevant certifications:
+
+Microsoft Certified: DevOps Engineer Expert (AZ-400)
+
+Microsoft Certified: Azure Administrator Associate (AZ-104)
+
+GitHub Actions or GitHub Administration Certification
